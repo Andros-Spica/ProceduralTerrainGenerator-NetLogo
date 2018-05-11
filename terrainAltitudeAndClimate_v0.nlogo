@@ -485,7 +485,7 @@ INPUTBOX
 151
 70
 randomSeed
-1
+0
 1
 0
 Number
@@ -749,10 +749,10 @@ degrees
 HORIZONTAL
 
 INPUTBOX
-521
-130
-634
-190
+466
+150
+579
+210
 par_initialDayInYear
 1
 1
@@ -775,10 +775,10 @@ days
 HORIZONTAL
 
 BUTTON
-422
-85
-533
-118
+357
+61
+468
+94
 NIL
 updateClimate
 NIL
@@ -833,12 +833,12 @@ degrees
 HORIZONTAL
 
 BUTTON
-440
-125
-517
-158
-+1 year
-repeat yearLenghtInDays [ go ]
+426
+119
+485
+152
++1 day
+repeat 1 [ go ]
 NIL
 1
 T
@@ -928,7 +928,7 @@ CHOOSER
 PaintMode
 PaintMode
 "terrain" "sun angle at noon" "temperature"
-0
+2
 
 MONITOR
 494
@@ -964,12 +964,12 @@ currentYear
 11
 
 BUTTON
-440
-159
-516
-192
-+10 years
-repeat (10 * yearLenghtInDays) [ go ]
+485
+119
+546
+152
++30 days
+repeat 30 [ go ]
 NIL
 1
 T
@@ -1046,6 +1046,33 @@ TEXTBOX
 Slope
 14
 0.0
+1
+
+TEXTBOX
+516
+99
+552
+117
+Time
+14
+0.0
+1
+
+BUTTON
+546
+119
+651
+152
+advance time
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
 1
 
 @#$#@#$#@
