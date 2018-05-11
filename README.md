@@ -3,10 +3,10 @@ Procedural generation of maps (terrain, climate, biomes) using NetLogo
 
 ## Terrain
 
-![alt text](screenshots/terrainAltitude_v0_simple interface.png?raw=true "v0")
+![terrain01](screenshots/terrainAltitude_v0_simple interface.png?raw=true "terrain v0")
 
-![alt text](screenshots/terrainAltitude_v1_twoAlgorithms interface.png?raw=true "v1")
+![terrain02](screenshots/terrainAltitude_v1_twoAlgorithms interface.png?raw=true "terrain v1")
 
 ## Climate
 
-![alt text](screenshots/terrainAltitudeAndClimate_v0 interface.png?raw=true "v0")
+![climate01](screenshots/terrainAltitudeAndClimate_v0 interface.png?raw=true "climate v0")
