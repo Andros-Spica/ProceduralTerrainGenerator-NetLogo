@@ -2,7 +2,7 @@
 ;;; GNU GENERAL PUBLIC LICENSE ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;  The PondTrade model
+;;  Terrain Generator model v.1
 ;;  Copyright (C) 2018 Andreas Angourakis (andros.spica@gmail.com)
 ;;
 ;;  This program is free software: you can redistribute it and/or modify
@@ -23,12 +23,12 @@ globals
   maxDist
   numContinents numOceans
   numRanges rangeLength numRifts riftLength
-  seaLevel stdDevdAltitude altitudeSmoothStep smoothingNeighborhood
-  landOceanRatio altitudeDistribution minAltitude oneSdAltitude maxAltitude
+  seaLevel stdDevdElevation elevationSmoothStep smoothingNeighborhood
+  landOceanRatio elevationDistribution minElevation oneSdElevation maxElevation
 ]
 
 patches-own
-[ altitude ]
+[ elevation ]
 
 breed [ mapSetters mapSetter ]
 
@@ -45,16 +45,16 @@ to setup
 
   set numRanges par_numRanges
   set rangeLength round ( par_rangeLength * max-pxcor)
-  set maxAltitude par_maxAltitude
+  set maxElevation par_maxElevation
   set numRifts par_numRifts
   set riftLength round ( par_riftLength * max-pxcor)
-  set minAltitude par_minAltitude
+  set minElevation par_minElevation
 
   ;set continentality (par_continentality * (count patches / 2))
 
   set seaLevel par_seaLevel
-  set stdDevdAltitude par_stdDevAltitude
-  set altitudeSmoothStep par_altitudeSmoothStep
+  set stdDevdElevation par_stdDevElevation
+  set elevationSmoothStep par_elevationSmoothStep
   set smoothingNeighborhood par_smoothingNeighborhood * maxDist
 
   random-seed randomSeed
@@ -71,11 +71,11 @@ to setup
 
   print (word "Computing time: " timer)
 
-  set landOceanRatio count patches with [altitude > seaLevel] / count patches
-  set altitudeDistribution [altitude] of patches
-  set minAltitude min [altitude] of patches
-  set maxAltitude max [altitude] of patches
-  set oneSdAltitude standard-deviation [altitude] of patches
+  set landOceanRatio count patches with [elevation > seaLevel] / count patches
+  set elevationDistribution [elevation] of patches
+  set minElevation min [elevation] of patches
+  set maxElevation max [elevation] of patches
+  set oneSdElevation standard-deviation [elevation] of patches
 
   paintPatches
 
@@ -83,7 +83,7 @@ to setup
 
 end
 
-to setLandform-NetLogo ;[ minAltitude maxAltitude numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood altitudeSmoothStep]
+to setLandform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
 
   ; Netlogo-like code
   ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
@@ -95,9 +95,9 @@ to setLandform-NetLogo ;[ minAltitude maxAltitude numRanges rangeLength numRifts
     ask one-of mapSetters
     [
       let sign 1
-      let scale maxAltitude
-      if ( points < 0 ) [ set sign -1 set scale minAltitude ]
-      ask patch-here [ set altitude scale ]
+      let scale maxElevation
+      if ( points < 0 ) [ set sign -1 set scale minElevation ]
+      ask patch-here [ set elevation scale ]
       set points points - sign
       if (points = 0) [die]
       rt (random-exponential par_featureAngleRange) * (1 - random-float 2)
@@ -105,31 +105,31 @@ to setLandform-NetLogo ;[ minAltitude maxAltitude numRanges rangeLength numRifts
     ]
   ]
 
-  smoothAltitude
+  smoothElevation
 
   let continentality par_continentality * count patches
-  let underWaterPatches patches with [altitude < 0]
-  let aboveWaterPatches patches with [altitude > 0]
+  let underWaterPatches patches with [elevation < 0]
+  let aboveWaterPatches patches with [elevation > 0]
 
   repeat continentality
   [
     if (any? underWaterPatches AND any? aboveWaterPatches)
     [
-      let p_ocean max-one-of underWaterPatches [ count neighbors with [altitude > 0] ]
-      let p_land  max-one-of aboveWaterPatches [ count neighbors with [altitude < 0] ]
-      let temp [altitude] of p_ocean
-      ask p_ocean [ set altitude [altitude] of p_land ]
-      ask p_land [ set altitude temp ]
+      let p_ocean max-one-of underWaterPatches [ count neighbors with [elevation > 0] ]
+      let p_land  max-one-of aboveWaterPatches [ count neighbors with [elevation < 0] ]
+      let temp [elevation] of p_ocean
+      ask p_ocean [ set elevation [elevation] of p_land ]
+      ask p_land [ set elevation temp ]
       set underWaterPatches underWaterPatches with [pxcor != [pxcor] of p_ocean AND pycor != [pycor] of p_ocean]
       set aboveWaterPatches aboveWaterPatches with [pxcor != [pxcor] of p_land AND pycor != [pycor] of p_land]
     ]
   ]
 
-  smoothAltitude
+  smoothElevation
 
 end
 
-to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood altitudeSmoothStep]
+to setLandform-Csharp ;[ minElevation maxElevation stdDevdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -159,18 +159,18 @@ to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents n
     [
       set numRifts numRifts - 1
       set len riftLength - 2
-      set alt minAltitude
-      ;ifelse (any? patches with [altitude < 0]) [set p0 one-of patches with [altitude < 0]] [set p0 one-of patches]
+      set alt minElevation
+      ;ifelse (any? patches with [elevation < 0]) [set p0 one-of patches with [elevation < 0]] [set p0 one-of patches]
       set p1 one-of patches with [ distance one-of oceans < maxDistBetweenRifts ]
     ]
     [
       set numRanges numRanges - 1
       set len rangeLength - 2
-      set alt maxAltitude
+      set alt maxElevation
       set p1 one-of patches with [ distance one-of continents < maxDistBetweenRanges ]
     ]
 
-    ask p1 [ set altitude alt set p2 one-of neighbors ]
+    ask p1 [ set elevation alt set p2 one-of neighbors ]
     set x-direction ([pxcor] of p2) - ([pxcor] of p1)
     set y-direction ([pycor] of p2) - ([pycor] of p1)
     ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
@@ -198,29 +198,29 @@ to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents n
       set p1 p2
       ask p2
       [
-        set altitude alt
+        set elevation alt
         if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
       ]
     ]
   ]
 
-  smoothAltitude
+  smoothElevation
 
-  ask patches with [altitude = 0]
+  ask patches with [elevation = 0]
   [
-    set altitude random-normal 0 stdDevdAltitude
+    set elevation random-normal 0 stdDevdElevation
   ]
 
-  smoothAltitude
+  smoothElevation
 
 end
 
-to smoothAltitude ;[ smoothingNeighborhood altitudeSmoothStep ]
+to smoothElevation ;[ smoothingNeighborhood elevationSmoothStep ]
 
     ask patches
   [
-    let smoothedAltitude mean [altitude] of patches in-radius smoothingNeighborhood
-    set altitude altitude + (smoothedAltitude - altitude) * altitudeSmoothStep
+    let smoothedElevation mean [elevation] of patches in-radius smoothingNeighborhood
+    set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
   ]
 
 end
@@ -229,19 +229,19 @@ to paintPatches
 
   ask patches
   [
-    let altitudeGradient 0
-    ifelse (altitude < seaLevel)
+    let elevationGradient 0
+    ifelse (elevation < seaLevel)
     [
-      let normSubAltitude (-1) * (seaLevel - altitude)
-      let normSubMinAltitude (-1) * (seaLevel - minAltitude)
-      set altitudeGradient 20 + (200 * (1 - normSubAltitude / normSubMinAltitude))
-      set pcolor rgb 0 0 altitudeGradient
+      let normSubElevation (-1) * (seaLevel - elevation)
+      let normSubMinElevation (-1) * (seaLevel - minElevation)
+      set elevationGradient 20 + (200 * (1 - normSubElevation / normSubMinElevation))
+      set pcolor rgb 0 0 elevationGradient
     ]
     [
-      let normSupAltitude altitude - seaLevel
-      let normSupMaxAltitude maxAltitude - seaLevel
-      set altitudeGradient 100 + (155 * (normSupAltitude / normSupMaxAltitude))
-      set pcolor rgb (altitudeGradient - 100) altitudeGradient 0
+      let normSupElevation elevation - seaLevel
+      let normSupMaxElevation maxElevation - seaLevel
+      set elevationGradient 100 + (155 * (normSupElevation / normSupMaxElevation))
+      set pcolor rgb (elevationGradient - 100) elevationGradient 0
     ]
 
   ]
@@ -270,7 +270,7 @@ GRAPHICS-WINDOW
 1
 1
 0
-0
+1
 0
 1
 -100
@@ -318,9 +318,9 @@ SLIDER
 43
 par_seaLevel
 par_seaLevel
-- par_stdDevAltitude
-par_stdDevAltitude
--58.0
+par_minElevation
+par_maxElevation
+-5.0
 1
 1
 m
@@ -331,11 +331,11 @@ SLIDER
 130
 175
 163
-par_stdDevAltitude
-par_stdDevAltitude
+par_stdDevElevation
+par_stdDevElevation
 1
 5000
-201.0
+801.0
 100
 1
 m
@@ -344,10 +344,10 @@ HORIZONTAL
 SLIDER
 176
 81
-357
+358
 114
-par_altitudeSmoothStep
-par_altitudeSmoothStep
+par_elevationSmoothStep
+par_elevationSmoothStep
 0
 1
 1.0
@@ -362,7 +362,7 @@ INPUTBOX
 311
 249
 randomSeed
-0.0
+1.0
 1
 0
 Number
@@ -381,10 +381,10 @@ Number
 MONITOR
 631
 456
-721
+729
 501
-oneSdAltitude
-precision oneSdAltitude 4
+oneSdElevation
+precision oneSdElevation 4
 4
 1
 11
@@ -392,10 +392,10 @@ precision oneSdAltitude 4
 MONITOR
 727
 456
-801
+809
 501
-minAltitude
-precision minAltitude 4
+minElevation
+precision minElevation 4
 4
 1
 11
@@ -403,10 +403,10 @@ precision minAltitude 4
 MONITOR
 805
 456
-884
+892
 501
-maxAltitude
-precision maxAltitude 4
+maxElevation
+precision maxElevation 4
 4
 1
 11
@@ -417,7 +417,7 @@ INPUTBOX
 94
 227
 par_numRanges
-5.0
+50.0
 1
 0
 Number
@@ -428,7 +428,7 @@ INPUTBOX
 185
 227
 par_rangeLength
-0.5
+0.2
 1
 0
 Number
@@ -439,7 +439,7 @@ INPUTBOX
 93
 287
 par_numRifts
-5.0
+50.0
 1
 0
 Number
@@ -450,7 +450,7 @@ INPUTBOX
 185
 287
 par_riftLength
-2.0
+0.5
 1
 0
 Number
@@ -460,11 +460,11 @@ SLIDER
 64
 175
 97
-par_minAltitude
-par_minAltitude
+par_minElevation
+par_minElevation
 -5000
 0
--500.0
+-5000.0
 100
 1
 m
@@ -492,18 +492,18 @@ SLIDER
 97
 175
 130
-par_maxAltitude
-par_maxAltitude
+par_maxElevation
+par_maxElevation
 0
 5000
-500.0
+5000.0
 100
 1
 m
 HORIZONTAL
 
 MONITOR
-372
+365
 455
 450
 500
@@ -537,7 +537,7 @@ par_riftAggregation
 par_riftAggregation
 0
 1
-0.7
+0.21
 .01
 1
 NIL
@@ -549,7 +549,7 @@ INPUTBOX
 112
 402
 par_numContinents
-10.0
+3.0
 1
 0
 Number
@@ -560,7 +560,7 @@ INPUTBOX
 204
 402
 par_numOceans
-1.0
+10.0
 1
 0
 Number
@@ -607,7 +607,7 @@ PLOT
 403
 359
 523
-Altitude per patch
+Elevation per patch
 m
 NIL
 0.0
@@ -616,9 +616,9 @@ NIL
 10.0
 true
 false
-"" "set-plot-x-range (round min [altitude] of patches - 1) (round max [altitude] of patches + 1)"
+"" "set-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
 PENS
-"default" 1.0 1 -16777216 true "" "histogram [altitude] of patches"
+"default" 1.0 1 -16777216 true "" "histogram [elevation] of patches"
 
 CHOOSER
 76
@@ -659,7 +659,7 @@ par_featureAngleRange
 par_featureAngleRange
 0
 360
-20.0
+30.0
 1
 1
 º

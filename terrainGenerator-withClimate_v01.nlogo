@@ -2,7 +2,7 @@
 ;;; GNU GENERAL PUBLIC LICENSE ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;  The PondTrade model
+;;  Terrain Generator with Climate model v.0.1
 ;;  Copyright (C) 2018 Andreas Angourakis (andros.spica@gmail.com)
 ;;
 ;;  This program is free software: you can redistribute it and/or modify
@@ -22,27 +22,27 @@ globals
 [
   maxDist
 
-  ; terrainAltitude parameters
+  ; terrain parameters
   numContinents numOceans
   maxDistBetweenRanges maxDistBetweenRifts
   continents oceans
   numRanges rangeLength numRifts riftLength
-  seaLevel stdDevdAltitude altitudeSmoothStep smoothingNeighborhood
-  landOceanRatio altitudeDistribution minAltitude oneSdAltitude maxAltitude
+  seaLevel SdElevation elevationSmoothStep smoothingNeighborhood
+  landOceanRatio elevationDistribution minElevation oneSdElevation maxElevation
 
   ; slope parameters
   meanSlope stdDevSlope axisGridInDegrees currentDayInYear yearLenghtInDays
 
   ; temperature parameters
   polarLatitude tropicLatitude
-  minTemperatureAtSeaLevel maxTemperatureAtSeaLevel temperatureDecreaseByAltitude temperatureDecreaseBySlope
+  minTemperatureAtSeaLevel maxTemperatureAtSeaLevel temperatureDecreaseByElevation temperatureDecreaseBySlope
   sunDeclination currentYear
   minTemperature maxTemperature
 ]
 
 patches-own
 [
-  altitude
+  elevation
   slope
   latitude latitudeRegion
   windDirection sunAngle temperature
@@ -65,13 +65,13 @@ to setup
   set maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist ; 0.21 (21% of maxDist)
   set numRanges par_numRanges ; 50
   set rangeLength round ( par_rangeLength * max-pxcor) ; 0.2
-  set maxAltitude par_maxAltitude ; 5000 m
+  set maxElevation par_maxElevation ; 5000 m
   set numRifts par_numRifts ; 50
   set riftLength round ( par_riftLength * max-pxcor) ; 0.5
-  set minAltitude par_minAltitude ; -5000 m
+  set minElevation par_minElevation ; -5000 m
   set seaLevel par_seaLevel ; 0 m
-  set stdDevdAltitude par_stdDevAltitude ; 800 m
-  set altitudeSmoothStep par_altitudeSmoothStep ; 1
+  set SdElevation par_SdElevation ; 800 m
+  set elevationSmoothStep par_elevationSmoothStep ; 1
   set smoothingNeighborhood par_smoothingNeighborhood * maxDist ; 0.03 (3% of maxDist)
 
   set meanSlope par_meanSlope
@@ -83,7 +83,7 @@ to setup
   set tropicLatitude par_tropicLatitude
   set minTemperatureAtSeaLevel par_minTemperatureAtSeaLevel
   set maxTemperatureAtSeaLevel par_maxTemperatureAtSeaLevel
-  set temperatureDecreaseByAltitude par_temperatureDecreaseByAltitude
+  set temperatureDecreaseByElevation par_temperatureDecreaseByElevation
   set temperatureDecreaseBySlope par_temperatureDecreaseBySlope
 
   random-seed randomSeed
@@ -99,11 +99,11 @@ to setup
 
   print (word "Temperature computing time: " timer)
 
-  set landOceanRatio count patches with [altitude > seaLevel] / count patches
-  set altitudeDistribution [altitude] of patches
-  set minAltitude min [altitude] of patches
-  set maxAltitude max [altitude] of patches
-  set oneSdAltitude standard-deviation [altitude] of patches
+  set landOceanRatio count patches with [elevation > seaLevel] / count patches
+  set elevationDistribution [elevation] of patches
+  set minElevation min [elevation] of patches
+  set maxElevation max [elevation] of patches
+  set oneSdElevation standard-deviation [elevation] of patches
 
   set minTemperature min [temperature] of patches
   set maxTemperature max [temperature] of patches
@@ -139,18 +139,18 @@ to setLandform-Csharp
     [
       set numRifts numRifts - 1
       set len riftLength - 2
-      set alt minAltitude
-      ;ifelse (any? patches with [altitude < 0]) [set p0 one-of patches with [altitude < 0]] [set p0 one-of patches]
+      set alt minElevation
+      ;ifelse (any? patches with [elevation < 0]) [set p0 one-of patches with [elevation < 0]] [set p0 one-of patches]
       set p1 one-of patches with [ distance one-of oceans < maxDistBetweenRifts ]
     ]
     [
       set numRanges numRanges - 1
       set len rangeLength - 2
-      set alt maxAltitude
+      set alt maxElevation
       set p1 one-of patches with [ distance one-of continents < maxDistBetweenRanges ]
     ]
 
-    ask p1 [ set altitude alt set p2 one-of neighbors ]
+    ask p1 [ set elevation alt set p2 one-of neighbors ]
     set x-direction ([pxcor] of p2) - ([pxcor] of p1)
     set y-direction ([pycor] of p2) - ([pycor] of p1)
     ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
@@ -178,29 +178,29 @@ to setLandform-Csharp
       set p1 p2
       ask p2
       [
-        set altitude alt
+        set elevation alt
         if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
       ]
     ]
   ]
 
-  smoothAltitude
+  smoothElevation
 
-  ask patches with [altitude = 0]
+  ask patches with [elevation = 0]
   [
-    set altitude random-normal 0 stdDevdAltitude
+    set elevation random-normal 0 SdElevation
   ]
 
-  smoothAltitude
+  smoothElevation
 
 end
 
-to smoothAltitude
+to smoothElevation
 
     ask patches
   [
-    let smoothedAltitude mean [altitude] of patches in-radius smoothingNeighborhood
-    set altitude altitude + (smoothedAltitude - altitude) * altitudeSmoothStep
+    let smoothedElevation mean [elevation] of patches in-radius smoothingNeighborhood
+    set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
   ]
 
 end
@@ -286,10 +286,10 @@ to updateClimate
     ; Set temperature
     ;; according to sun angle
     set temperature (abs sunAngle / 90) * (maxTemperatureAtSeaLevel - minTemperatureAtSeaLevel) + minTemperatureAtSeaLevel
-    ;; according to altitude and slope
-    if (altitude > seaLevel)
+    ;; according to elevation and slope
+    if (elevation > seaLevel)
     [
-      set temperature temperature - (altitude - seaLevel) * temperatureDecreaseByAltitude;
+      set temperature temperature - (elevation - seaLevel) * temperatureDecreaseByElevation
       set temperature temperature - slope * temperatureDecreaseBySlope;
     ]
     ;; TO DO: diffuse temperature according to wind direction
@@ -321,19 +321,19 @@ to paintPatches
   [
     ifelse (PaintMode = "terrain")
     [
-      let altitudeGradient 0
-      ifelse (altitude < seaLevel)
+      let elevationGradient 0
+      ifelse (elevation < seaLevel)
       [
-        let normSubAltitude (-1) * (seaLevel - altitude)
-        let normSubMinAltitude (-1) * (seaLevel - minAltitude)
-        set altitudeGradient 20 + (200 * (1 - normSubAltitude / normSubMinAltitude))
-        set pcolor rgb 0 0 altitudeGradient
+        let normSubElevation (-1) * (seaLevel - elevation)
+        let normSubMinElevation (-1) * (seaLevel - minElevation)
+        set elevationGradient 20 + (200 * (1 - normSubElevation / normSubMinElevation))
+        set pcolor rgb 0 0 elevationGradient
       ]
       [
-        let normSupAltitude altitude - seaLevel
-        let normSupMaxAltitude maxAltitude - seaLevel
-        set altitudeGradient 100 + (155 * (normSupAltitude / normSupMaxAltitude))
-        set pcolor rgb (altitudeGradient - 100) altitudeGradient 0
+        let normSupElevation elevation - seaLevel
+        let normSupMaxElevation maxElevation - seaLevel
+        set elevationGradient 100 + (155 * (normSupElevation / normSupMaxElevation))
+        set pcolor rgb (elevationGradient - 100) elevationGradient 0
       ]
     ]
     [
@@ -441,8 +441,8 @@ SLIDER
 294
 par_seaLevel
 par_seaLevel
-- par_stdDevAltitude
-par_stdDevAltitude
+par_minElevation
+par_maxElevation
 0.0
 1
 1
@@ -454,8 +454,8 @@ SLIDER
 162
 175
 195
-par_stdDevAltitude
-par_stdDevAltitude
+par_SdElevation
+par_SdElevation
 1
 5000
 801.0
@@ -469,8 +469,8 @@ SLIDER
 194
 184
 227
-par_altitudeSmoothStep
-par_altitudeSmoothStep
+par_elevationSmoothStep
+par_elevationSmoothStep
 0
 1
 1.0
@@ -491,12 +491,12 @@ randomSeed
 Number
 
 MONITOR
-436
+432
 501
-526
+530
 546
-oneSdAltitude
-precision oneSdAltitude 4
+oneSdElevation
+precision oneSdElevation 4
 4
 1
 11
@@ -504,10 +504,10 @@ precision oneSdAltitude 4
 MONITOR
 532
 501
-606
+614
 546
-minAltitude
-precision minAltitude 4
+minElevation
+precision minElevation 4
 4
 1
 11
@@ -517,8 +517,8 @@ MONITOR
 501
 689
 546
-maxAltitude
-precision maxAltitude 4
+maxElevation
+precision maxElevation 4
 4
 1
 11
@@ -572,8 +572,8 @@ SLIDER
 96
 175
 129
-par_minAltitude
-par_minAltitude
+par_minElevation
+par_minElevation
 -5000
 0
 -5000.0
@@ -604,8 +604,8 @@ SLIDER
 129
 175
 162
-par_maxAltitude
-par_maxAltitude
+par_maxElevation
+par_maxElevation
 0
 5000
 5000.0
@@ -617,7 +617,7 @@ HORIZONTAL
 MONITOR
 177
 500
-255
+259
 545
 NIL
 count patches
@@ -882,10 +882,10 @@ HORIZONTAL
 SLIDER
 416
 312
-684
+687
 345
-par_temperatureDecreaseByAltitude
-par_temperatureDecreaseByAltitude
+par_temperatureDecreaseByElevation
+par_temperatureDecreaseByElevation
 0
 1
 0.01
@@ -910,7 +910,7 @@ Celsius
 HORIZONTAL
 
 MONITOR
-215
+208
 450
 310
 495
@@ -981,11 +981,11 @@ NIL
 1
 
 TEXTBOX
-59
+52
 78
 109
-96
-Altitude
+112
+Elevation
 14
 0.0
 1

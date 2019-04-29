@@ -2,7 +2,7 @@
 ;;; GNU GENERAL PUBLIC LICENSE ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;  The PondTrade model
+;;  Terrain Generator model v.0.1
 ;;  Copyright (C) 2018 Andreas Angourakis (andros.spica@gmail.com)
 ;;
 ;;  This program is free software: you can redistribute it and/or modify
@@ -21,14 +21,14 @@
 globals
 [
   landPercentage continentality seaLevel
-  minAltitude meanAltitude stdDevdAltitude maxAltitude altitudeSmoothStep
+  minElevation meanElevation stdDevElevation maxElevation elevationSmoothStep
   landOceanRatio
 
 ]
 
 patches-own
 [
-  land altitude
+  land elevation
 ]
 
 to setup
@@ -38,11 +38,11 @@ to setup
   set landPercentage par_landPercentage ; 30
   set continentality par_continentality ; 5
   set seaLevel par_seaLevel ; 0
-  set minAltitude par_minAltitude ; -2000
-  set meanAltitude par_meanAltitude ; 0
-  set stdDevdAltitude par_stdDevAltitude ; 1000
-  set maxAltitude par_maxAltitude ; 3000
-  set altitudeSmoothStep par_altitudeSmoothStep ; 1
+  set minElevation par_minElevation ; -2000
+  set meanElevation par_meanElevation ; 0
+  set stdDevElevation par_stdDevElevation ; 1000
+  set maxElevation par_maxElevation ; 3000
+  set elevationSmoothStep par_elevationSmoothStep ; 1
 
   random-seed randomSeed
   setLandform
@@ -86,19 +86,19 @@ to setLandform
 
   ask patches
   [
-    set altitude land * (random-normal meanAltitude stdDevdAltitude)
-    while [altitude < minAltitude OR altitude > maxAltitude]
+    set elevation land * (random-normal meanElevation stdDevElevation)
+    while [elevation < minElevation OR elevation > maxElevation]
     [
-      set altitude land * (random-normal meanAltitude stdDevdAltitude)
-      ;minAltitude + (random-normal meanAltitude stdDevdAltitude) * (maxAltitude - minAltitude)
+      set elevation land * (random-normal meanElevation stdDevElevation)
+      ;minElevation + (random-normal meanElevation stdDevElevation) * (maxElevation - minElevation)
     ]
   ]
 
   ask patches
   [
-    let smoothedAltitude mean [altitude] of neighbors
-    set altitude altitude + (smoothedAltitude - altitude) * altitudeSmoothStep
-    ifelse (altitude < seaLevel)
+    let smoothedElevation mean [elevation] of neighbors
+    set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
+    ifelse (elevation < seaLevel)
     [ set land -1 ] [ set land 1 ]
   ]
 
@@ -108,15 +108,15 @@ to paintPatches
 
   ask patches
   [
-    let altitudeGradient 0
-    ifelse (altitude < seaLevel)
+    let elevationGradient 0
+    ifelse (elevation < seaLevel)
     [
-      set altitudeGradient 20 + (200 * (1 - altitude / minAltitude))
-      set pcolor rgb 0 0 altitudeGradient
+      set elevationGradient 20 + (200 * (1 - elevation / minElevation))
+      set pcolor rgb 0 0 elevationGradient
     ]
     [
-      set altitudeGradient 100 + (155 * (altitude / maxAltitude))
-      set pcolor rgb  0 altitudeGradient 0
+      set elevationGradient 100 + (155 * (elevation / maxElevation))
+      set pcolor rgb  0 elevationGradient 0
     ]
 
   ]
@@ -185,12 +185,12 @@ SLIDER
 247
 par_seaLevel
 par_seaLevel
-minAltitude
-maxAltitude
--98.0
+par_minElevation
+par_maxElevation
+0.0
 1
 1
-NIL
+m
 HORIZONTAL
 
 SLIDER
@@ -228,8 +228,8 @@ SLIDER
 264
 197
 297
-par_minAltitude
-par_minAltitude
+par_minElevation
+par_minElevation
 -5000
 0
 -5000.0
@@ -241,13 +241,13 @@ HORIZONTAL
 SLIDER
 24
 296
-196
+197
 329
-par_meanAltitude
-par_meanAltitude
-- par_stdDevAltitude
-par_stdDevAltitude
-599.0
+par_meanElevation
+par_meanElevation
+- par_stdDevElevation
+par_stdDevElevation
+-101.0
 100
 1
 m
@@ -256,13 +256,13 @@ HORIZONTAL
 SLIDER
 24
 329
-196
+197
 362
-par_stdDevAltitude
-par_stdDevAltitude
+par_stdDevElevation
+par_stdDevElevation
 1
-max (list par_maxAltitude (- par_minAltitude))
-901.0
+max (list par_maxElevation (- par_minElevation))
+1101.0
 100
 1
 m
@@ -273,8 +273,8 @@ SLIDER
 361
 196
 394
-par_maxAltitude
-par_maxAltitude
+par_maxElevation
+par_maxElevation
 0
 5000
 5000.0
@@ -286,10 +286,10 @@ HORIZONTAL
 SLIDER
 21
 407
-205
+218
 440
-par_altitudeSmoothStep
-par_altitudeSmoothStep
+par_elevationSmoothStep
+par_elevationSmoothStep
 0
 1
 0.76
@@ -314,7 +314,7 @@ PLOT
 21
 1112
 206
-Altitude
+Elevation
 NIL
 NIL
 0.0
@@ -323,9 +323,9 @@ NIL
 10.0
 true
 false
-"set-plot-x-range par_minAltitude par_maxAltitude" "set-plot-x-range (round min [altitude] of patches - 1) (round max [altitude] of patches + 1)"
+"set-plot-x-range par_minElevation par_maxElevation" "set-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
 PENS
-"default" 1.0 1 -16777216 false "histogram [altitude] of patches" "histogram [altitude] of patches"
+"default" 1.0 1 -16777216 false "histogram [elevation] of patches" "histogram [elevation] of patches"
 
 @#$#@#$#@
 ## WHAT IS IT?
