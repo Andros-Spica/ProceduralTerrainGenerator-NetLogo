@@ -22,22 +22,47 @@ globals
 [
   maxDist
 
-  ; terrain parameters
-  numContinents numOceans
-  maxDistBetweenRanges maxDistBetweenRifts
-  continents oceans
-  numRanges rangeLength numRifts riftLength
-  seaLevel SdElevation elevationSmoothStep smoothingNeighborhood
-  landOceanRatio elevationDistribution minElevation oneSdElevation maxElevation
+  ;;; parameters (copies) ===============================================================
 
-  ; slope parameters
-  meanSlope stdDevSlope axisGridInDegrees currentDayInYear yearLenghtInDays
+  ;;;; elevation
+  numContinents
+  numOceans
+  numRanges
+  rangeLength
+  numRifts
+  riftLength
+  seaLevel
+  elevationSmoothStep
+  smoothingNeighborhood
 
-  ; temperature parameters
-  polarLatitude tropicLatitude
-  minTemperatureAtSeaLevel maxTemperatureAtSeaLevel temperatureDecreaseByElevation temperatureDecreaseBySlope
-  sunDeclination currentYear
-  minTemperature maxTemperature
+  ;;;; slope
+  meanSlope
+  stdDevSlope
+
+  ;;;; latitude
+  axisGridInDegrees
+  yearLenghtInDays
+
+  ;;;; temperature
+  polarLatitude
+  tropicLatitude
+  minTemperatureAtSeaLevel
+  maxTemperatureAtSeaLevel
+  temperatureDecreaseByElevation
+  temperatureDecreaseBySlope
+
+  ;;; variables ===============================================================
+  landOceanRatio
+  elevationDistribution
+  minElevation
+  sdElevation
+  maxElevation
+
+  currentYear
+  currentDayInYear
+  sunDeclination
+  minTemperature
+  maxTemperature
 ]
 
 patches-own
@@ -58,11 +83,11 @@ to setup
 
   clear-all
 
+  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
+
   set numContinents par_numContinents ; 3
   set numOceans par_numOceans ; 10
-  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
-  set maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist ; 0.75 (75% of maxDist)
-  set maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist ; 0.21 (21% of maxDist)
+
   set numRanges par_numRanges ; 50
   set rangeLength round ( par_rangeLength * max-pxcor) ; 0.2
   set maxElevation par_maxElevation ; 5000 m
@@ -103,7 +128,7 @@ to setup
   set elevationDistribution [elevation] of patches
   set minElevation min [elevation] of patches
   set maxElevation max [elevation] of patches
-  set oneSdElevation standard-deviation [elevation] of patches
+  set sdElevation standard-deviation [elevation] of patches
 
   set minTemperature min [temperature] of patches
   set maxTemperature max [temperature] of patches
@@ -112,7 +137,7 @@ to setup
 
 end
 
-to setLandform-Csharp
+to setLandform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -126,8 +151,11 @@ to setLandform-Csharp
   let x-move 0
   let y-move 0
 
-  set continents n-of numContinents patches
-  set oceans n-of numOceans patches
+  let continents n-of numContinents patches
+  let oceans n-of numOceans patches
+
+  let maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist
+  let maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist
 
   repeat (numRanges + numRifts)
   [
@@ -172,7 +200,7 @@ to setLandform-Csharp
 
     repeat len
     [
-      set directionAngle directionAngle + (random-exponential 30) * (1 - random-float 2)
+      set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
       set directionAngle directionAngle mod 360
 
       set p1 p2
@@ -188,14 +216,14 @@ to setLandform-Csharp
 
   ask patches with [elevation = 0]
   [
-    set elevation random-normal 0 SdElevation
+    set elevation random-normal 0 par_sdElevation
   ]
 
   smoothElevation
 
 end
 
-to smoothElevation
+to smoothElevation ;[ smoothingNeighborhood elevationSmoothStep ]
 
     ask patches
   [
@@ -454,8 +482,8 @@ SLIDER
 162
 175
 195
-par_SdElevation
-par_SdElevation
+par_sdElevation
+par_sdElevation
 1
 5000
 801.0
@@ -496,7 +524,7 @@ MONITOR
 530
 546
 oneSdElevation
-precision oneSdElevation 4
+precision sdElevation 4
 4
 1
 11
@@ -1074,6 +1102,21 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+5
+554
+198
+587
+par_featureAngleRange
+par_featureAngleRange
+0
+360
+30.0
+1
+1
+º
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?

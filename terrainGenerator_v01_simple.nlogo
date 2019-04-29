@@ -20,10 +20,18 @@
 
 globals
 [
-  landPercentage continentality seaLevel
-  minElevation meanElevation stdDevElevation maxElevation elevationSmoothStep
-  landOceanRatio
+  ;;; parameters (copies) ===============================================================
+  landPercentage
+  continentality
+  seaLevel
+  minElevation
+  meanElevation
+  sdElevation
+  maxElevation
+  elevationSmoothStep
 
+  ;;; variables ===============================================================
+  landOceanRatio
 ]
 
 patches-own
@@ -40,7 +48,7 @@ to setup
   set seaLevel par_seaLevel ; 0
   set minElevation par_minElevation ; -2000
   set meanElevation par_meanElevation ; 0
-  set stdDevElevation par_stdDevElevation ; 1000
+  set sdElevation par_sdElevation ; 1000
   set maxElevation par_maxElevation ; 3000
   set elevationSmoothStep par_elevationSmoothStep ; 1
 
@@ -86,11 +94,11 @@ to setLandform
 
   ask patches
   [
-    set elevation land * (random-normal meanElevation stdDevElevation)
+    set elevation land * (random-normal meanElevation sdElevation)
     while [elevation < minElevation OR elevation > maxElevation]
     [
-      set elevation land * (random-normal meanElevation stdDevElevation)
-      ;minElevation + (random-normal meanElevation stdDevElevation) * (maxElevation - minElevation)
+      set elevation land * (random-normal meanElevation sdElevation)
+      ;minElevation + (random-normal meanElevation sdElevation) * (maxElevation - minElevation)
     ]
   ]
 
@@ -245,8 +253,8 @@ SLIDER
 329
 par_meanElevation
 par_meanElevation
-- par_stdDevElevation
-par_stdDevElevation
+par_minElevation
+par_maxElevation
 -101.0
 100
 1
@@ -258,8 +266,8 @@ SLIDER
 329
 197
 362
-par_stdDevElevation
-par_stdDevElevation
+par_sdElevation
+par_sdElevation
 1
 max (list par_maxElevation (- par_minElevation))
 1101.0

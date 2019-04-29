@@ -21,10 +21,24 @@
 globals
 [
   maxDist
-  numContinents numOceans
-  numRanges rangeLength numRifts riftLength
-  seaLevel stdDevdElevation elevationSmoothStep smoothingNeighborhood
-  landOceanRatio elevationDistribution minElevation oneSdElevation maxElevation
+
+  ;;; parameters (copies) ===============================================================
+  numContinents
+  numOceans
+  numRanges
+  rangeLength
+  numRifts
+  riftLength
+  seaLevel
+  elevationSmoothStep
+  smoothingNeighborhood
+
+  ;;; variables ===============================================================
+  landOceanRatio
+  elevationDistribution
+  minElevation
+  sdElevation
+  maxElevation
 ]
 
 patches-own
@@ -53,7 +67,6 @@ to setup
   ;set continentality (par_continentality * (count patches / 2))
 
   set seaLevel par_seaLevel
-  set stdDevdElevation par_stdDevElevation
   set elevationSmoothStep par_elevationSmoothStep
   set smoothingNeighborhood par_smoothingNeighborhood * maxDist
 
@@ -75,7 +88,7 @@ to setup
   set elevationDistribution [elevation] of patches
   set minElevation min [elevation] of patches
   set maxElevation max [elevation] of patches
-  set oneSdElevation standard-deviation [elevation] of patches
+  set sdElevation standard-deviation [elevation] of patches
 
   paintPatches
 
@@ -129,7 +142,7 @@ to setLandform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRif
 
 end
 
-to setLandform-Csharp ;[ minElevation maxElevation stdDevdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
+to setLandform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -208,7 +221,7 @@ to setLandform-Csharp ;[ minElevation maxElevation stdDevdElevation numContinent
 
   ask patches with [elevation = 0]
   [
-    set elevation random-normal 0 stdDevdElevation
+    set elevation random-normal 0 par_sdElevation
   ]
 
   smoothElevation
@@ -322,7 +335,7 @@ par_seaLevel
 par_seaLevel
 par_minElevation
 par_maxElevation
--287.0
+-5.0
 1
 1
 m
@@ -333,8 +346,8 @@ SLIDER
 130
 175
 163
-par_stdDevElevation
-par_stdDevElevation
+par_sdElevation
+par_sdElevation
 1
 5000
 801.0
@@ -385,8 +398,8 @@ MONITOR
 456
 729
 501
-oneSdElevation
-precision oneSdElevation 4
+sdElevation
+precision sdElevation 4
 4
 1
 11
@@ -539,7 +552,7 @@ par_riftAggregation
 par_riftAggregation
 0
 1
-0.06
+0.21
 .01
 1
 NIL
