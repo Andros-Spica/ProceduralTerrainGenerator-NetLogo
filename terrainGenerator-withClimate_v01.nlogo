@@ -89,10 +89,10 @@ to setup
   set numOceans par_numOceans ; 10
 
   set numRanges par_numRanges ; 50
-  set rangeLength round ( par_rangeLength * max-pxcor) ; 0.2
+  set rangeLength round ( par_rangeLength * maxDist) ; 0.2
   set maxElevation par_maxElevation ; 5000 m
   set numRifts par_numRifts ; 50
-  set riftLength round ( par_riftLength * max-pxcor) ; 0.5
+  set riftLength round ( par_riftLength * maxDist) ; 0.5
   set minElevation par_minElevation ; -5000 m
   set seaLevel par_seaLevel ; 0 m
   set SdElevation par_SdElevation ; 800 m

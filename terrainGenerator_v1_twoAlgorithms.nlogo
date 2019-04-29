@@ -58,10 +58,10 @@ to setup
   set numOceans par_numOceans
 
   set numRanges par_numRanges
-  set rangeLength round ( par_rangeLength * max-pxcor)
+  set rangeLength round ( par_rangeLength * maxDist)
   set maxElevation par_maxElevation
   set numRifts par_numRifts
-  set riftLength round ( par_riftLength * max-pxcor)
+  set riftLength round ( par_riftLength * maxDist)
   set minElevation par_minElevation
 
   ;set continentality (par_continentality * (count patches / 2))
