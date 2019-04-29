@@ -129,7 +129,7 @@ to setLandform-NetLogo ;[ minAltitude maxAltitude numRanges rangeLength numRifts
 
 end
 
-to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents numRanges rangeLength numOceans numRifts riftLength maxDistBetweenRanges smoothingNeighborhood altitudeSmoothStep]
+to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood altitudeSmoothStep]
 
   ; C#-like code
   let p1 0

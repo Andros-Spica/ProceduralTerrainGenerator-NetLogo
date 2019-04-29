@@ -382,8 +382,8 @@ end
 GRAPHICS-WINDOW
 692
 10
-1307
-546
+1305
+524
 -1
 -1
 5.0
@@ -443,7 +443,7 @@ par_seaLevel
 par_seaLevel
 - par_stdDevAltitude
 par_stdDevAltitude
-0
+0.0
 1
 1
 m
@@ -458,7 +458,7 @@ par_stdDevAltitude
 par_stdDevAltitude
 1
 5000
-801
+801.0
 100
 1
 m
@@ -473,7 +473,7 @@ par_altitudeSmoothStep
 par_altitudeSmoothStep
 0
 1
-1
+1.0
 0.01
 1
 NIL
@@ -485,7 +485,7 @@ INPUTBOX
 151
 70
 randomSeed
-0
+0.0
 1
 0
 Number
@@ -529,7 +529,7 @@ INPUTBOX
 92
 360
 par_numRanges
-50
+50.0
 1
 0
 Number
@@ -551,7 +551,7 @@ INPUTBOX
 91
 420
 par_numRifts
-50
+50.0
 1
 0
 Number
@@ -576,7 +576,7 @@ par_minAltitude
 par_minAltitude
 -5000
 0
--5000
+-5000.0
 100
 1
 m
@@ -608,7 +608,7 @@ par_maxAltitude
 par_maxAltitude
 0
 5000
-5000
+5000.0
 100
 1
 m
@@ -661,7 +661,7 @@ INPUTBOX
 112
 481
 par_numContinents
-3
+3.0
 1
 0
 Number
@@ -672,7 +672,7 @@ INPUTBOX
 204
 481
 par_numOceans
-10
+10.0
 1
 0
 Number
@@ -712,7 +712,7 @@ par_meanSlope
 par_meanSlope
 0
 80
-25
+25.0
 0.1
 1
 degrees
@@ -727,7 +727,7 @@ par_stdDevSlope
 par_stdDevSlope
 0
 80
-20
+20.0
 0.01
 1
 degrees
@@ -754,7 +754,7 @@ INPUTBOX
 579
 210
 par_initialDayInYear
-1
+1.0
 1
 0
 Number
@@ -768,7 +768,7 @@ par_yearLenghtInDays
 par_yearLenghtInDays
 1
 600
-365
+365.0
 1
 1
 days
@@ -858,7 +858,7 @@ par_minTemperatureAtSeaLevel
 par_minTemperatureAtSeaLevel
 -50
 par_maxTemperatureAtSeaLevel
--40
+-40.0
 1
 1
 Celsius
@@ -873,7 +873,7 @@ par_maxTemperatureAtSeaLevel
 par_maxTemperatureAtSeaLevel
 par_minTemperatureAtSeaLevel
 50
-40
+40.0
 1
 1
 Celsius
@@ -903,7 +903,7 @@ par_temperatureDecreaseBySlope
 par_temperatureDecreaseBySlope
 0
 1
-0
+0.0
 0.01
 1
 Celsius
@@ -1422,9 +1422,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
+NetLogo 6.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -1440,7 +1439,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 0
 @#$#@#$#@

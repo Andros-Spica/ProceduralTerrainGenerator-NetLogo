@@ -126,10 +126,10 @@ end
 GRAPHICS-WINDOW
 210
 10
-630
-451
-20
-20
+628
+429
+-1
+-1
 10.0
 1
 10
@@ -187,7 +187,7 @@ par_seaLevel
 par_seaLevel
 minAltitude
 maxAltitude
--98
+-98.0
 1
 1
 NIL
@@ -202,7 +202,7 @@ par_landPercentage
 par_landPercentage
 0
 100
-50
+50.0
 1
 1
 NIL
@@ -217,7 +217,7 @@ par_continentality
 par_continentality
 1
 50
-1
+1.0
 1
 1
 NIL
@@ -232,7 +232,7 @@ par_minAltitude
 par_minAltitude
 -5000
 0
--5000
+-5000.0
 100
 1
 m
@@ -247,7 +247,7 @@ par_meanAltitude
 par_meanAltitude
 - par_stdDevAltitude
 par_stdDevAltitude
-599
+599.0
 100
 1
 m
@@ -262,7 +262,7 @@ par_stdDevAltitude
 par_stdDevAltitude
 1
 max (list par_maxAltitude (- par_minAltitude))
-901
+901.0
 100
 1
 m
@@ -277,7 +277,7 @@ par_maxAltitude
 par_maxAltitude
 0
 5000
-5000
+5000.0
 100
 1
 m
@@ -304,7 +304,7 @@ INPUTBOX
 173
 73
 randomSeed
-0
+0.0
 1
 0
 Number
@@ -668,9 +668,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
+NetLogo 6.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -686,7 +685,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 0
 @#$#@#$#@
