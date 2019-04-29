@@ -22,8 +22,6 @@ globals
 [
   maxDist
   numContinents numOceans
-  maxDistBetweenRanges maxDistBetweenRifts
-  continents oceans
   numRanges rangeLength numRifts riftLength
   seaLevel stdDevdAltitude altitudeSmoothStep smoothingNeighborhood
   landOceanRatio altitudeDistribution minAltitude oneSdAltitude maxAltitude
@@ -40,11 +38,11 @@ to setup
 
   clear-all
 
+  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
+
   set numContinents par_numContinents
   set numOceans par_numOceans
-  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
-  set maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist
-  set maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist
+
   set numRanges par_numRanges
   set rangeLength round ( par_rangeLength * max-pxcor)
   set maxAltitude par_maxAltitude
@@ -85,7 +83,7 @@ to setup
 
 end
 
-to setLandform-NetLogo
+to setLandform-NetLogo ;[ minAltitude maxAltitude numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood altitudeSmoothStep]
 
   ; Netlogo-like code
   ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
@@ -102,7 +100,7 @@ to setLandform-NetLogo
       ask patch-here [ set altitude scale ]
       set points points - sign
       if (points = 0) [die]
-      rt (random-exponential 10) * (1 - random-float 2)
+      rt (random-exponential par_featureAngleRange) * (1 - random-float 2)
       forward 1
     ]
   ]
@@ -131,7 +129,7 @@ to setLandform-NetLogo
 
 end
 
-to setLandform-Csharp
+to setLandform-Csharp ;[ minAltitude maxAltitude stdDevdAltitude numContinents numRanges rangeLength numOceans numRifts riftLength maxDistBetweenRanges smoothingNeighborhood altitudeSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -145,8 +143,11 @@ to setLandform-Csharp
   let x-move 0
   let y-move 0
 
-  set continents n-of numContinents patches
-  set oceans n-of numOceans patches
+  let continents n-of numContinents patches
+  let oceans n-of numOceans patches
+
+  let maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist
+  let maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist
 
   repeat (numRanges + numRifts)
   [
@@ -191,7 +192,7 @@ to setLandform-Csharp
 
     repeat len
     [
-      set directionAngle directionAngle + (random-exponential 30) * (1 - random-float 2)
+      set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
       set directionAngle directionAngle mod 360
 
       set p1 p2
@@ -214,7 +215,7 @@ to setLandform-Csharp
 
 end
 
-to smoothAltitude
+to smoothAltitude ;[ smoothingNeighborhood altitudeSmoothStep ]
 
     ask patches
   [
@@ -258,10 +259,10 @@ end
 GRAPHICS-WINDOW
 358
 10
-1172
-445
-100
-50
+1170
+423
+-1
+-1
 4.0
 1
 10
@@ -269,7 +270,7 @@ GRAPHICS-WINDOW
 1
 1
 0
-1
+0
 0
 1
 -100
@@ -319,7 +320,7 @@ par_seaLevel
 par_seaLevel
 - par_stdDevAltitude
 par_stdDevAltitude
--5
+-58.0
 1
 1
 m
@@ -334,7 +335,7 @@ par_stdDevAltitude
 par_stdDevAltitude
 1
 5000
-801
+201.0
 100
 1
 m
@@ -349,7 +350,7 @@ par_altitudeSmoothStep
 par_altitudeSmoothStep
 0
 1
-1
+1.0
 0.01
 1
 NIL
@@ -361,7 +362,7 @@ INPUTBOX
 311
 249
 randomSeed
-1
+0.0
 1
 0
 Number
@@ -416,7 +417,7 @@ INPUTBOX
 94
 227
 par_numRanges
-50
+5.0
 1
 0
 Number
@@ -427,7 +428,7 @@ INPUTBOX
 185
 227
 par_rangeLength
-0.2
+0.5
 1
 0
 Number
@@ -438,7 +439,7 @@ INPUTBOX
 93
 287
 par_numRifts
-50
+5.0
 1
 0
 Number
@@ -449,7 +450,7 @@ INPUTBOX
 185
 287
 par_riftLength
-0.5
+2.0
 1
 0
 Number
@@ -463,7 +464,7 @@ par_minAltitude
 par_minAltitude
 -5000
 0
--5000
+-500.0
 100
 1
 m
@@ -495,7 +496,7 @@ par_maxAltitude
 par_maxAltitude
 0
 5000
-5000
+500.0
 100
 1
 m
@@ -536,7 +537,7 @@ par_riftAggregation
 par_riftAggregation
 0
 1
-0.21
+0.7
 .01
 1
 NIL
@@ -548,7 +549,7 @@ INPUTBOX
 112
 402
 par_numContinents
-3
+10.0
 1
 0
 Number
@@ -559,7 +560,7 @@ INPUTBOX
 204
 402
 par_numOceans
-10
+1.0
 1
 0
 Number
@@ -648,6 +649,21 @@ used when algorithm-style = Netlogo
 9
 0.0
 1
+
+SLIDER
+5
+287
+185
+320
+par_featureAngleRange
+par_featureAngleRange
+0
+360
+20.0
+1
+1
+º
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -990,9 +1006,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.3.1
+NetLogo 6.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -1008,7 +1023,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 0
 @#$#@#$#@
