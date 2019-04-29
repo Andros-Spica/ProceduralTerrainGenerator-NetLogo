@@ -286,7 +286,7 @@ HORIZONTAL
 SLIDER
 21
 407
-218
+209
 440
 par_elevationSmoothStep
 par_elevationSmoothStep
@@ -326,6 +326,7 @@ false
 "set-plot-x-range par_minElevation par_maxElevation" "set-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
 PENS
 "default" 1.0 1 -16777216 false "histogram [elevation] of patches" "histogram [elevation] of patches"
+"pen-1" 1.0 1 -2674135 true "" "histogram n-values plot-y-max [j -> seaLevel]"
 
 @#$#@#$#@
 ## WHAT IS IT?
