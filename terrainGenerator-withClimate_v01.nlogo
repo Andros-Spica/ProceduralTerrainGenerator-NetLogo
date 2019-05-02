@@ -1229,7 +1229,7 @@ Number
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+using the C#-style terrain, this is an initial approach to defining patch temperatures and wind directions to be integrated into a climate simulation. Temperature is dependent only on latitude, elevation, and slope (both elevation and slope are average values for a given patch). Wind direction is dependent on latitude (latitude regions are defined according to Coriolis effect). Still no atmoshperic dynamics in this version.
 
 ## HOW IT WORKS
 

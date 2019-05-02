@@ -689,7 +689,7 @@ HORIZONTAL
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+this version presents two cleaner and more complete algorithms. NetLogo-style uses patch and turtle calls while C#-style is my attempt of a more lower-level object-based language). I refer to C# because I was actually prototyping these algorithms to use them in [Unity](https://unity3d.com).
 
 ## HOW IT WORKS
 

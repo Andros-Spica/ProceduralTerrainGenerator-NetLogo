@@ -339,7 +339,7 @@ PENS
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+the initial, quite simple approach.
 
 ## HOW IT WORKS
 
