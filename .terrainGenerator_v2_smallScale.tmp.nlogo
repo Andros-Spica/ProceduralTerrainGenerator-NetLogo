@@ -76,10 +76,10 @@ to setup
 
   ifelse (algorithm-style = "NetLogo")
   [
-    set-landform-NetLogo
+    setLandform-NetLogo
   ]
   [
-    set-landform-Csharp
+    setLandform-Csharp
   ]
 
   print (word "Computing time: " timer)
@@ -90,13 +90,13 @@ to setup
   set maxElevation max [elevation] of patches
   set sdElevation standard-deviation [elevation] of patches
 
-  paint-patches
+  paintPatches
 
   update-plots
 
 end
 
-to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
+to setLandform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
 
   ; Netlogo-like code
   ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
@@ -118,7 +118,7 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
     ]
   ]
 
-  smooth-elevation
+  smoothElevation
 
   let continentality par_continentality * count patches
   let underWaterPatches patches with [elevation < 0]
@@ -138,17 +138,23 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
     ]
   ]
 
-  smooth-elevation
+  smoothElevation
 
 end
 
-to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
+to setLandform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
+  let p2 0
   let sign 0
   let len 0
-  let elev 0
+  let alt 0
+  let x-direction 0
+  let y-direction 0
+  let directionAngle 0
+  let x-move 0
+  let y-move 0
 
   let continents n-of numContinents patches
   let oceans n-of numOceans patches
@@ -166,74 +172,63 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
     [
       set numRifts numRifts - 1
       set len riftLength - 2
-      set elev minElevation
+      set alt minElevation
       ;ifelse (any? patches with [elevation < 0]) [set p0 one-of patches with [elevation < 0]] [set p0 one-of patches]
       set p1 one-of patches with [ distance one-of oceans < maxDistBetweenRifts ]
     ]
     [
       set numRanges numRanges - 1
       set len rangeLength - 2
-      set elev maxElevation
+      set alt maxElevation
       set p1 one-of patches with [ distance one-of continents < maxDistBetweenRanges ]
     ]
 
-    draw-elevation-pattern p1 len elev
-  ]
-
-  smooth-elevation
-
-  ask patches with [elevation = 0]
-  [
-    set elevation random-normal 0 par_sdElevation
-  ]
-
-  smooth-elevation
-
-end
-
-to draw-elevation-pattern [ p1 len elev ]
-
-  let p2 0
-  let x-direction 0
-  let y-direction 0
-  let directionAngle 0
-
-  ask p1 [ set elevation elev set p2 one-of neighbors ]
-  set x-direction ([pxcor] of p2) - ([pxcor] of p1)
-  set y-direction ([pycor] of p2) - ([pycor] of p1)
-  ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
-  [ ifelse (x-direction = 1 AND y-direction = 1) [ set directionAngle 45 ]
-    [ ifelse (x-direction = 0 AND y-direction = 1) [ set directionAngle 90 ]
-      [ ifelse (x-direction = -1 AND y-direction = 1) [ set directionAngle 135 ]
-        [ ifelse (x-direction = -1 AND y-direction = 0) [ set directionAngle 180 ]
-          [ ifelse (x-direction = -1 AND y-direction = -1) [ set directionAngle 225 ]
-            [ ifelse (x-direction = 0 AND y-direction = -1) [ set directionAngle 270 ]
-              [ ifelse (x-direction = 1 AND y-direction = -1) [ set directionAngle 315 ]
-                [ if (x-direction = 1 AND y-direction = 0) [ set directionAngle 360 ] ]
+    ask p1 [ set elevation alt set p2 one-of neighbors ]
+    set x-direction ([pxcor] of p2) - ([pxcor] of p1)
+    set y-direction ([pycor] of p2) - ([pycor] of p1)
+    ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
+    [ ifelse (x-direction = 1 AND y-direction = 1) [ set directionAngle 45 ]
+      [ ifelse (x-direction = 0 AND y-direction = 1) [ set directionAngle 90 ]
+        [ ifelse (x-direction = -1 AND y-direction = 1) [ set directionAngle 135 ]
+          [ ifelse (x-direction = -1 AND y-direction = 0) [ set directionAngle 180 ]
+            [ ifelse (x-direction = -1 AND y-direction = -1) [ set directionAngle 225 ]
+              [ ifelse (x-direction = 0 AND y-direction = -1) [ set directionAngle 270 ]
+                [ ifelse (x-direction = 1 AND y-direction = -1) [ set directionAngle 315 ]
+                  [ if (x-direction = 1 AND y-direction = 0) [ set directionAngle 360 ] ]
+                ]
               ]
             ]
           ]
         ]
       ]
     ]
-  ]
 
-  repeat len
-  [
-    set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
-    set directionAngle directionAngle mod 360
-
-    set p1 p2
-    ask p2
+    repeat len
     [
-      set elevation elev
-      if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
+      set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
+      set directionAngle directionAngle mod 360
+
+      set p1 p2
+      ask p2
+      [
+        set elevation alt
+        if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
+      ]
     ]
   ]
 
+  smoothElevation
+
+  ask patches with [elevation = 0]
+  [
+    set elevation random-normal 0 par_sdElevation
+  ]
+
+  smoothElevation
+
 end
 
-to smooth-elevation ;[ smoothingNeighborhood elevationSmoothStep ]
+to smoothElevation ;[ smoothingNeighborhood elevationSmoothStep ]
 
     ask patches
   [
@@ -243,7 +238,7 @@ to smooth-elevation ;[ smoothingNeighborhood elevationSmoothStep ]
 
 end
 
-to paint-patches
+to paintPatches
 
   ask patches
   [
@@ -272,31 +267,31 @@ to refresh-after-seaLevel-change
 
   update-plots
 
-  paint-patches
+  paintPatches
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 358
 10
-1170
-423
+768
+422
 -1
 -1
-4.0
+8.0
 1
 10
 1
 1
 1
 0
-1
+0
 0
 1
--100
-100
--50
-50
+0
+49
+0
+49
 0
 0
 1
@@ -321,10 +316,10 @@ NIL
 1
 
 MONITOR
-526
-455
-627
-500
+199
+535
+300
+580
 NIL
 landOceanRatio
 4
@@ -338,8 +333,8 @@ SLIDER
 43
 par_seaLevel
 par_seaLevel
-min (list minElevation par_minElevation)
-min (list maxElevation par_maxElevation)
+par_minElevation
+par_maxElevation
 -5.0
 1
 1
@@ -399,10 +394,10 @@ par_continentality
 Number
 
 MONITOR
-631
-456
-729
-501
+37
+592
+135
+637
 sdElevation
 precision sdElevation 4
 4
@@ -410,10 +405,10 @@ precision sdElevation 4
 11
 
 MONITOR
-727
-456
-809
-501
+134
+592
+216
+637
 minElevation
 precision minElevation 4
 4
@@ -421,10 +416,10 @@ precision minElevation 4
 11
 
 MONITOR
-805
-456
-892
-501
+210
+592
+297
+637
 maxElevation
 precision maxElevation 4
 4
@@ -523,10 +518,10 @@ m
 HORIZONTAL
 
 MONITOR
-365
-455
-450
-500
+37
+535
+122
+580
 NIL
 count patches
 0
@@ -601,10 +596,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-455
-455
-520
-500
+127
+535
+192
+580
 maxDist
 precision maxDist 4
 4

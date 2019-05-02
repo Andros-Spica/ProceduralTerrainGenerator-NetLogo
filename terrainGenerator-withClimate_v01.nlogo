@@ -115,12 +115,18 @@ to setup
 
   reset-timer
 
-  setLandform-Csharp
+  ifelse (algorithm-style = "NetLogo")
+  [
+    set-landform-NetLogo
+  ]
+  [
+    set-landform-Csharp
+  ]
 
   print (word "Terrain computing time: " timer)
 
   setup-latitude-and-windDirections
-  updateClimate
+  update-climate
 
   print (word "Temperature computing time: " timer)
 
@@ -133,23 +139,63 @@ to setup
   set minTemperature min [temperature] of patches
   set maxTemperature max [temperature] of patches
 
-  paintPatches
+  paint-patches
 
 end
 
-to setLandform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
+to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
+
+  ; Netlogo-like code
+  ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
+  ask n-of numRifts patches with [any? turtles-here = false] [ sprout-mapSetters 1 [ set points (random riftLength) * -1 ] ]
+
+  let steps sum [ abs points ] of mapSetters
+  repeat steps
+  [
+    ask one-of mapSetters
+    [
+      let sign 1
+      let scale maxElevation
+      if ( points < 0 ) [ set sign -1 set scale minElevation ]
+      ask patch-here [ set elevation scale ]
+      set points points - sign
+      if (points = 0) [die]
+      rt (random-exponential par_featureAngleRange) * (1 - random-float 2)
+      forward 1
+    ]
+  ]
+
+  smooth-elevation
+
+  let continentality par_continentality * count patches
+  let underWaterPatches patches with [elevation < 0]
+  let aboveWaterPatches patches with [elevation > 0]
+
+  repeat continentality
+  [
+    if (any? underWaterPatches AND any? aboveWaterPatches)
+    [
+      let p_ocean max-one-of underWaterPatches [ count neighbors with [elevation > 0] ]
+      let p_land  max-one-of aboveWaterPatches [ count neighbors with [elevation < 0] ]
+      let temp [elevation] of p_ocean
+      ask p_ocean [ set elevation [elevation] of p_land ]
+      ask p_land [ set elevation temp ]
+      set underWaterPatches underWaterPatches with [pxcor != [pxcor] of p_ocean AND pycor != [pycor] of p_ocean]
+      set aboveWaterPatches aboveWaterPatches with [pxcor != [pxcor] of p_land AND pycor != [pycor] of p_land]
+    ]
+  ]
+
+  smooth-elevation
+
+end
+
+to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
-  let p2 0
   let sign 0
   let len 0
-  let alt 0
-  let x-direction 0
-  let y-direction 0
-  let directionAngle 0
-  let x-move 0
-  let y-move 0
+  let elev 0
 
   let continents n-of numContinents patches
   let oceans n-of numOceans patches
@@ -167,69 +213,90 @@ to setLandform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents
     [
       set numRifts numRifts - 1
       set len riftLength - 2
-      set alt minElevation
+      set elev minElevation
       ;ifelse (any? patches with [elevation < 0]) [set p0 one-of patches with [elevation < 0]] [set p0 one-of patches]
       set p1 one-of patches with [ distance one-of oceans < maxDistBetweenRifts ]
     ]
     [
       set numRanges numRanges - 1
       set len rangeLength - 2
-      set alt maxElevation
+      set elev maxElevation
       set p1 one-of patches with [ distance one-of continents < maxDistBetweenRanges ]
     ]
 
-    ask p1 [ set elevation alt set p2 one-of neighbors ]
-    set x-direction ([pxcor] of p2) - ([pxcor] of p1)
-    set y-direction ([pycor] of p2) - ([pycor] of p1)
-    ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
-    [ ifelse (x-direction = 1 AND y-direction = 1) [ set directionAngle 45 ]
-      [ ifelse (x-direction = 0 AND y-direction = 1) [ set directionAngle 90 ]
-        [ ifelse (x-direction = -1 AND y-direction = 1) [ set directionAngle 135 ]
-          [ ifelse (x-direction = -1 AND y-direction = 0) [ set directionAngle 180 ]
-            [ ifelse (x-direction = -1 AND y-direction = -1) [ set directionAngle 225 ]
-              [ ifelse (x-direction = 0 AND y-direction = -1) [ set directionAngle 270 ]
-                [ ifelse (x-direction = 1 AND y-direction = -1) [ set directionAngle 315 ]
-                  [ if (x-direction = 1 AND y-direction = 0) [ set directionAngle 360 ] ]
-                ]
-              ]
-            ]
-          ]
-        ]
-      ]
-    ]
-
-    repeat len
-    [
-      set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
-      set directionAngle directionAngle mod 360
-
-      set p1 p2
-      ask p2
-      [
-        set elevation alt
-        if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
-      ]
-    ]
+    draw-elevation-pattern p1 len elev
   ]
 
-  smoothElevation
+  smooth-elevation
 
   ask patches with [elevation = 0]
   [
     set elevation random-normal 0 par_sdElevation
   ]
 
-  smoothElevation
+  smooth-elevation
 
 end
 
-to smoothElevation ;[ smoothingNeighborhood elevationSmoothStep ]
+to draw-elevation-pattern [ p1 len elev ]
+
+  let p2 0
+  let x-direction 0
+  let y-direction 0
+  let directionAngle 0
+
+  ask p1 [ set elevation elev set p2 one-of neighbors ]
+  set x-direction ([pxcor] of p2) - ([pxcor] of p1)
+  set y-direction ([pycor] of p2) - ([pycor] of p1)
+  ifelse (x-direction = 1 AND y-direction = 0) [ set directionAngle 0 ]
+  [ ifelse (x-direction = 1 AND y-direction = 1) [ set directionAngle 45 ]
+    [ ifelse (x-direction = 0 AND y-direction = 1) [ set directionAngle 90 ]
+      [ ifelse (x-direction = -1 AND y-direction = 1) [ set directionAngle 135 ]
+        [ ifelse (x-direction = -1 AND y-direction = 0) [ set directionAngle 180 ]
+          [ ifelse (x-direction = -1 AND y-direction = -1) [ set directionAngle 225 ]
+            [ ifelse (x-direction = 0 AND y-direction = -1) [ set directionAngle 270 ]
+              [ ifelse (x-direction = 1 AND y-direction = -1) [ set directionAngle 315 ]
+                [ if (x-direction = 1 AND y-direction = 0) [ set directionAngle 360 ] ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+
+  repeat len
+  [
+    set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
+    set directionAngle directionAngle mod 360
+
+    set p1 p2
+    ask p2
+    [
+      set elevation elev
+      if (patch-at-heading-and-distance directionAngle 1 != nobody) [ set p2 patch-at-heading-and-distance directionAngle 1 ]
+    ]
+  ]
+
+end
+
+to smooth-elevation ;[ smoothingNeighborhood elevationSmoothStep ]
 
     ask patches
   [
     let smoothedElevation mean [elevation] of patches in-radius smoothingNeighborhood
     set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
   ]
+
+end
+
+to refresh-after-seaLevel-change
+
+  set seaLevel par_seaLevel
+
+  update-plots
+
+  paint-patches
 
 end
 
@@ -300,7 +367,7 @@ to setup-latitude-and-windDirections
 
 end
 
-to updateClimate
+to update-climate
 
   ; set sun declination
   set sunDeclination (- 1) * axisGridInDegrees * cos (360 * currentDayInYear / yearLenghtInDays)
@@ -334,16 +401,16 @@ to go
     set currentDayInYear currentDayInYear mod yearLenghtInDays
   ]
 
-  updateClimate
+  update-climate
 
   set minTemperature min [temperature] of patches
   set maxTemperature max [temperature] of patches
 
-  paintPatches
+  paint-patches
 
 end
 
-to paintPatches
+to paint-patches
 
   ask patches
   [
@@ -401,9 +468,9 @@ to refresh
 
   set seaLevel par_seaLevel
   set currentDayInYear par_initialDayInYear
-  updateClimate
+  update-climate
 
-  paintPatches
+  paint-patches
 
 end
 @#$#@#$#@
@@ -452,10 +519,10 @@ NIL
 1
 
 MONITOR
-331
-500
-432
-545
+330
+513
+431
+558
 NIL
 landOceanRatio
 4
@@ -464,13 +531,13 @@ landOceanRatio
 
 SLIDER
 3
-261
+306
 175
-294
+339
 par_seaLevel
 par_seaLevel
-par_minElevation
-par_maxElevation
+min (list minElevation par_minElevation)
+min (list maxElevation par_maxElevation)
 0.0
 1
 1
@@ -479,9 +546,9 @@ HORIZONTAL
 
 SLIDER
 3
-162
+207
 175
-195
+240
 par_sdElevation
 par_sdElevation
 1
@@ -494,9 +561,9 @@ HORIZONTAL
 
 SLIDER
 3
-194
+239
 184
-227
+272
 par_elevationSmoothStep
 par_elevationSmoothStep
 0
@@ -519,10 +586,10 @@ randomSeed
 Number
 
 MONITOR
-432
-501
-530
-546
+431
+514
+529
+559
 oneSdElevation
 precision sdElevation 4
 4
@@ -530,10 +597,10 @@ precision sdElevation 4
 11
 
 MONITOR
-532
-501
-614
-546
+531
+514
+613
+559
 minElevation
 precision minElevation 4
 4
@@ -541,10 +608,10 @@ precision minElevation 4
 11
 
 MONITOR
-610
-501
-689
-546
+609
+514
+688
+559
 maxElevation
 precision maxElevation 4
 4
@@ -553,9 +620,9 @@ precision maxElevation 4
 
 INPUTBOX
 4
-300
+345
 92
-360
+405
 par_numRanges
 50.0
 1
@@ -564,9 +631,9 @@ Number
 
 INPUTBOX
 91
-300
+345
 183
-360
+405
 par_rangeLength
 0.2
 1
@@ -575,9 +642,9 @@ Number
 
 INPUTBOX
 4
-360
+405
 91
-420
+465
 par_numRifts
 50.0
 1
@@ -586,9 +653,9 @@ Number
 
 INPUTBOX
 91
-360
+405
 183
-420
+465
 par_riftLength
 0.5
 1
@@ -597,9 +664,9 @@ Number
 
 SLIDER
 3
-96
+141
 175
-129
+174
 par_minElevation
 par_minElevation
 -5000
@@ -629,9 +696,9 @@ NIL
 
 SLIDER
 3
-129
+174
 175
-162
+207
 par_maxElevation
 par_maxElevation
 0
@@ -643,10 +710,10 @@ m
 HORIZONTAL
 
 MONITOR
-177
-500
-259
-545
+176
+513
+258
+558
 NIL
 count patches
 0
@@ -654,10 +721,10 @@ count patches
 11
 
 SLIDER
-5
-483
-159
-516
+9
+531
+163
+564
 par_rangeAggregation
 par_rangeAggregation
 0
@@ -669,10 +736,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-5
-516
-159
-549
+9
+564
+163
+597
 par_riftAggregation
 par_riftAggregation
 0
@@ -684,10 +751,10 @@ NIL
 HORIZONTAL
 
 INPUTBOX
-5
-421
-112
-481
+7
+598
+114
+658
 par_numContinents
 3.0
 1
@@ -695,10 +762,10 @@ par_numContinents
 Number
 
 INPUTBOX
-112
-421
-204
-481
+114
+598
+206
+658
 par_numOceans
 10.0
 1
@@ -707,9 +774,9 @@ Number
 
 SLIDER
 3
-227
+272
 184
-260
+305
 par_smoothingNeighborhood
 par_smoothingNeighborhood
 0
@@ -721,10 +788,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-260
-500
-325
-545
+259
+513
+324
+558
 maxDist
 precision maxDist 4
 4
@@ -732,10 +799,10 @@ precision maxDist 4
 11
 
 SLIDER
-206
-338
-394
-371
+204
+294
+392
+327
 par_meanSlope
 par_meanSlope
 0
@@ -747,10 +814,10 @@ degrees
 HORIZONTAL
 
 SLIDER
-205
-375
-409
-408
+203
+331
+407
+364
 par_stdDevSlope
 par_stdDevSlope
 0
@@ -762,10 +829,10 @@ degrees
 HORIZONTAL
 
 SLIDER
-200
-176
-404
-209
+198
+132
+402
+165
 par_axisGridInDegrees
 par_axisGridInDegrees
 0
@@ -788,10 +855,10 @@ par_initialDayInYear
 Number
 
 SLIDER
-200
-210
-404
-243
+198
+166
+402
+199
 par_yearLenghtInDays
 par_yearLenghtInDays
 1
@@ -805,10 +872,10 @@ HORIZONTAL
 BUTTON
 357
 61
-468
+470
 94
 NIL
-updateClimate
+update-climate
 NIL
 1
 T
@@ -820,10 +887,10 @@ NIL
 1
 
 MONITOR
-398
-450
-491
-495
+582
+413
+675
+458
 NIL
 sunDeclination
 4
@@ -831,10 +898,10 @@ sunDeclination
 11
 
 SLIDER
+198
 200
-244
-404
-277
+402
+233
 par_polarLatitude
 par_polarLatitude
 par_tropicLatitude
@@ -846,10 +913,10 @@ degrees
 HORIZONTAL
 
 SLIDER
-200
-278
-404
-311
+198
+234
+402
+267
 par_tropicLatitude
 par_tropicLatitude
 0
@@ -938,10 +1005,10 @@ Celsius
 HORIZONTAL
 
 MONITOR
-208
-450
-310
-495
+392
+413
+494
+458
 NIL
 currentDayInYear
 0
@@ -959,10 +1026,10 @@ PaintMode
 2
 
 MONITOR
-494
-450
-588
-495
+437
+463
+531
+508
 NIL
 minTemperature
 4
@@ -970,10 +1037,10 @@ minTemperature
 11
 
 MONITOR
-592
-450
-686
-495
+535
+463
+629
+508
 NIL
 maxTemperature
 4
@@ -981,10 +1048,10 @@ maxTemperature
 11
 
 MONITOR
-315
-450
-394
-495
+499
+413
+578
+458
 NIL
 currentYear
 0
@@ -1019,10 +1086,10 @@ Elevation
 1
 
 TEXTBOX
-266
-149
-356
-167
+264
+113
+354
+131
 Latitude
 14
 0.0
@@ -1034,7 +1101,7 @@ BUTTON
 417
 54
 refresh display
-paintPatches
+paint-patches
 NIL
 1
 T
@@ -1067,10 +1134,10 @@ Temperature
 1
 
 TEXTBOX
-278
-318
-319
-336
+276
+274
+317
+292
 Slope
 14
 0.0
@@ -1104,10 +1171,10 @@ NIL
 1
 
 SLIDER
-5
-554
-198
-587
+4
+466
+197
+499
 par_featureAngleRange
 par_featureAngleRange
 0
@@ -1117,6 +1184,47 @@ par_featureAngleRange
 1
 º
 HORIZONTAL
+
+CHOOSER
+15
+97
+146
+142
+algorithm-style
+algorithm-style
+"C#" "NetLogo"
+0
+
+TEXTBOX
+11
+515
+175
+543
+used when algorithm-style = C#
+11
+0.0
+1
+
+TEXTBOX
+205
+395
+389
+423
+used when algorithm-style = Netlogo
+11
+0.0
+1
+
+INPUTBOX
+215
+414
+370
+474
+par_continentality
+0.5
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?
