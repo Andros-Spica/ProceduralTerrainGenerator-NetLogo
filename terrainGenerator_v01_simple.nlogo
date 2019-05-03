@@ -18,6 +18,8 @@
 ;;  You should have received a copy of the GNU General Public License
 ;;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+breed [ transectLines transectLine ]
+
 globals
 [
   ;;; parameters (copies) ===============================================================
@@ -36,7 +38,8 @@ globals
 
 patches-own
 [
-  land elevation
+  land
+  elevation
 ]
 
 to setup
@@ -58,6 +61,12 @@ to setup
   set landOceanRatio count patches with [land = 1] / count patches
 
   paintPatches
+
+  setup-patch-coordinates-labels "bottom" "left"
+
+  setup-transect
+
+  update-transects
 
   update-plots
 
@@ -126,16 +135,108 @@ to paintPatches
       set elevationGradient 100 + (155 * (elevation / maxElevation))
       set pcolor rgb  0 elevationGradient 0
     ]
-
   ]
+
+end
+
+to setup-patch-coordinates-labels [ XcoordPosition YcoordPosition ]
+
+  let xspacing floor (world-width / patch-size)
+  let yspacing floor (world-height / patch-size)
+
+  ifelse (XcoordPosition = "bottom")
+  [
+    ask patches with [ pycor = min-pycor ]
+    [
+      if (pxcor mod xspacing = 0)
+      [ set plabel (word pxcor) ]
+    ]
+  ]
+  [
+    ask patches with [ pycor = max-pycor ]
+    [
+      if (pxcor mod xspacing = 0)
+      [ set plabel (word pxcor) ]
+    ]
+  ]
+
+  ifelse (YcoordPosition = "left")
+  [
+    ask patches with [ pxcor = min-pxcor ]
+    [
+      if (pycor mod yspacing = 0)
+      [ set plabel (word pycor) ]
+    ]
+  ]
+  [
+    ask patches with [ pycor = max-pycor ]
+    [
+      if (pycor mod yspacing = 0)
+      [ set plabel (word pycor) ]
+    ]
+  ]
+
+end
+
+to setup-transect
+
+  ask patches with [ pxcor = xTransect ]
+  [
+    sprout-transectLines 1 [ set shape "line" set heading 0 set color white ]
+  ]
+
+  ask patches with [ pycor = yTransect ]
+  [
+    sprout-transectLines 1 [ set shape "line" set heading 90 set color white ]
+  ]
+
+  if (not show-transects)
+  [
+    ask transectLines [ set hidden? true ]
+  ]
+
+end
+
+to update-transects
+
+  if (show-transects)
+  [
+    ask transectLines
+    [
+      ifelse (heading = 0) [ set xcor xTransect ] [ set ycor yTransect ]
+      set hidden? false
+    ]
+  ]
+
+end
+
+to plot-horizontal-transect
+
+  foreach (n-values world-width [ j -> min-pxcor + j ])
+  [
+    x ->
+    plotxy x ([elevation] of patch x yTransect)
+  ]
+  plot-pen-up
+
+end
+
+to plot-vertical-transect
+
+  foreach (n-values world-height [ j -> min-pycor + j ])
+  [
+    y ->
+    plotxy ([elevation] of patch xTransect y) y
+  ]
+  plot-pen-up
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
-10
-628
-429
+292
+43
+710
+462
 -1
 -1
 10.0
@@ -318,10 +419,10 @@ randomSeed
 Number
 
 PLOT
-678
-21
-1112
-206
+8
+446
+239
+582
 Elevation
 NIL
 NIL
@@ -335,6 +436,100 @@ false
 PENS
 "default" 1.0 1 -16777216 false "histogram [elevation] of patches" "histogram [elevation] of patches"
 "pen-1" 1.0 1 -2674135 true "" "histogram n-values plot-y-max [j -> seaLevel]"
+
+PLOT
+258
+466
+715
+586
+Horizontal transect
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" "clear-plot\nset-plot-x-range (min-pxcor - 1) (max-pxcor + 1)\nset-plot-y-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
+PENS
+"default" 1.0 0 -16777216 true "" "plot-horizontal-transect"
+
+SLIDER
+255
+34
+292
+466
+yTransect
+yTransect
+min-pycor
+max-pycor
+8.0
+1
+1
+NIL
+VERTICAL
+
+SLIDER
+285
+10
+719
+43
+xTransect
+xTransect
+min-pxcor
+max-pxcor
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+PLOT
+716
+28
+876
+473
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" "clear-plot\nset-plot-y-range (min-pycor - 1) (max-pycor + 1)\nset-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
+PENS
+"default" 1.0 0 -16777216 true "" "plot-vertical-transect"
+
+BUTTON
+731
+524
+848
+557
+update transects
+update-transects\nupdate-plots
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SWITCH
+721
+489
+862
+522
+show-transects
+show-transects
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
