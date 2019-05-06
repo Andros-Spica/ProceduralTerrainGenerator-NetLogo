@@ -414,7 +414,7 @@ to paint-patches
 
   ask patches
   [
-    ifelse (PaintMode = "terrain")
+    ifelse (display-mode = "terrain")
     [
       let elevationGradient 0
       ifelse (elevation < seaLevel)
@@ -432,18 +432,18 @@ to paint-patches
       ]
     ]
     [
-      ifelse (PaintMode = "sun angle at noon")
+      ifelse (display-mode = "sun angle at noon")
       [
         set pcolor rgb (255 * (sunAngle / 90)) 0 0
       ]
       [
-        if (PaintMode = "temperature")
+        if (display-mode = "temperature")
         [
           set pcolor rgb (255 * (abs (minTemperature - temperature) / abs (maxTemperature - minTemperature))) 0 0
         ]
       ]
     ]
-    ifelse (displayWindDirections)
+    ifelse (show-windDirections)
     [
       let thisPatch self
       ifelse (any? windIndicators-here)
@@ -519,10 +519,10 @@ NIL
 1
 
 MONITOR
-330
-513
-431
-558
+328
+105
+429
+150
 NIL
 landOceanRatio
 4
@@ -530,10 +530,10 @@ landOceanRatio
 11
 
 SLIDER
-3
-306
-175
-339
+453
+13
+625
+46
 par_seaLevel
 par_seaLevel
 min (list minElevation par_minElevation)
@@ -586,21 +586,21 @@ randomSeed
 Number
 
 MONITOR
-431
-514
-529
-559
-oneSdElevation
+177
+153
+275
+198
+sdElevation
 precision sdElevation 4
 4
 1
 11
 
 MONITOR
-531
-514
-613
-559
+277
+153
+359
+198
 minElevation
 precision minElevation 4
 4
@@ -608,10 +608,10 @@ precision minElevation 4
 11
 
 MONITOR
-609
-514
-688
-559
+355
+153
+434
+198
 maxElevation
 precision maxElevation 4
 4
@@ -620,9 +620,9 @@ precision maxElevation 4
 
 INPUTBOX
 4
-345
+311
 92
-405
+371
 par_numRanges
 50.0
 1
@@ -631,9 +631,9 @@ Number
 
 INPUTBOX
 91
-345
+311
 183
-405
+371
 par_rangeLength
 0.2
 1
@@ -642,9 +642,9 @@ Number
 
 INPUTBOX
 4
-405
+371
 91
-465
+431
 par_numRifts
 50.0
 1
@@ -653,9 +653,9 @@ Number
 
 INPUTBOX
 91
-405
+371
 183
-465
+431
 par_riftLength
 0.5
 1
@@ -678,10 +678,10 @@ m
 HORIZONTAL
 
 BUTTON
-424
-21
-657
-54
+425
+49
+658
+82
 refresh after changing sea level or initial day
 refresh
 NIL
@@ -710,10 +710,10 @@ m
 HORIZONTAL
 
 MONITOR
-176
-513
-258
-558
+174
+105
+256
+150
 NIL
 count patches
 0
@@ -721,10 +721,10 @@ count patches
 11
 
 SLIDER
-9
-531
-163
-564
+11
+497
+165
+530
 par_rangeAggregation
 par_rangeAggregation
 0
@@ -736,10 +736,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-9
-564
-163
-597
+11
+530
+165
+563
 par_riftAggregation
 par_riftAggregation
 0
@@ -751,10 +751,10 @@ NIL
 HORIZONTAL
 
 INPUTBOX
-7
-598
-114
-658
+165
+500
+272
+560
 par_numContinents
 3.0
 1
@@ -762,10 +762,10 @@ par_numContinents
 Number
 
 INPUTBOX
-114
-598
-206
-658
+272
+500
+364
+560
 par_numOceans
 10.0
 1
@@ -788,10 +788,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-259
-513
-324
-558
+257
+105
+322
+150
 maxDist
 precision maxDist 4
 4
@@ -800,9 +800,9 @@ precision maxDist 4
 
 SLIDER
 204
-294
-392
-327
+390
+407
+423
 par_meanSlope
 par_meanSlope
 0
@@ -815,9 +815,9 @@ HORIZONTAL
 
 SLIDER
 203
-331
+427
 407
-364
+460
 par_stdDevSlope
 par_stdDevSlope
 0
@@ -830,9 +830,9 @@ HORIZONTAL
 
 SLIDER
 198
-132
+228
 402
-165
+261
 par_axisGridInDegrees
 par_axisGridInDegrees
 0
@@ -844,10 +844,10 @@ degrees
 HORIZONTAL
 
 INPUTBOX
-466
-150
-579
-210
+490
+149
+603
+209
 par_initialDayInYear
 1.0
 1
@@ -856,9 +856,9 @@ Number
 
 SLIDER
 198
-166
+262
 402
-199
+295
 par_yearLenghtInDays
 par_yearLenghtInDays
 1
@@ -869,28 +869,11 @@ par_yearLenghtInDays
 days
 HORIZONTAL
 
-BUTTON
-357
-61
-470
-94
-NIL
-update-climate
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 MONITOR
-582
-413
-675
-458
+599
+217
+692
+262
 NIL
 sunDeclination
 4
@@ -899,9 +882,9 @@ sunDeclination
 
 SLIDER
 198
-200
+296
 402
-233
+329
 par_polarLatitude
 par_polarLatitude
 par_tropicLatitude
@@ -914,9 +897,9 @@ HORIZONTAL
 
 SLIDER
 198
-234
+330
 402
-267
+363
 par_tropicLatitude
 par_tropicLatitude
 0
@@ -928,10 +911,10 @@ degrees
 HORIZONTAL
 
 BUTTON
-426
-119
-485
-152
+453
+111
+512
+144
 +1 day
 repeat 1 [ go ]
 NIL
@@ -945,10 +928,10 @@ NIL
 1
 
 SLIDER
-416
-241
-652
-274
+415
+292
+682
+325
 par_minTemperatureAtSeaLevel
 par_minTemperatureAtSeaLevel
 -50
@@ -960,10 +943,10 @@ Celsius
 HORIZONTAL
 
 SLIDER
-416
-277
-651
-310
+415
+328
+682
+361
 par_maxTemperatureAtSeaLevel
 par_maxTemperatureAtSeaLevel
 par_minTemperatureAtSeaLevel
@@ -975,10 +958,10 @@ Celsius
 HORIZONTAL
 
 SLIDER
-416
-312
-687
-345
+415
+363
+683
+396
 par_temperatureDecreaseByElevation
 par_temperatureDecreaseByElevation
 0
@@ -990,10 +973,10 @@ Celsius
 HORIZONTAL
 
 SLIDER
-417
-349
-682
-382
+415
+398
+683
+431
 par_temperatureDecreaseBySlope
 par_temperatureDecreaseBySlope
 0
@@ -1005,10 +988,10 @@ Celsius
 HORIZONTAL
 
 MONITOR
-392
-413
-494
-458
+409
+217
+511
+262
 NIL
 currentDayInYear
 0
@@ -1016,20 +999,20 @@ currentDayInYear
 11
 
 CHOOSER
-156
+171
 13
-295
+310
 58
-PaintMode
-PaintMode
+display-mode
+display-mode
 "terrain" "sun angle at noon" "temperature"
-2
+0
 
 MONITOR
-437
-463
-531
-508
+457
+433
+551
+478
 NIL
 minTemperature
 4
@@ -1037,10 +1020,10 @@ minTemperature
 11
 
 MONITOR
-535
-463
-629
-508
+555
+433
+649
+478
 NIL
 maxTemperature
 4
@@ -1048,10 +1031,10 @@ maxTemperature
 11
 
 MONITOR
-499
-413
-578
-458
+516
+217
+595
+262
 NIL
 currentYear
 0
@@ -1059,10 +1042,10 @@ currentYear
 11
 
 BUTTON
-485
-119
-546
-152
+512
+111
+573
+144
 +30 days
 repeat 30 [ go ]
 NIL
@@ -1087,20 +1070,20 @@ Elevation
 
 TEXTBOX
 264
-113
+209
 354
-131
+227
 Latitude
 14
 0.0
 1
 
 BUTTON
-304
+319
 21
-417
+382
 54
-refresh display
+refresh
 paint-patches
 NIL
 1
@@ -1113,21 +1096,21 @@ NIL
 1
 
 SWITCH
-156
+171
 60
-306
+318
 93
-displayWindDirections
-displayWindDirections
+show-windDirections
+show-windDirections
 0
 1
 -1000
 
 TEXTBOX
-472
-215
-622
-233
+473
+271
+623
+289
 Temperature
 14
 0.0
@@ -1135,29 +1118,29 @@ Temperature
 
 TEXTBOX
 276
-274
+370
 317
-292
+388
 Slope
 14
 0.0
 1
 
 TEXTBOX
-516
-99
-552
-117
+543
+91
+579
+109
 Time
 14
 0.0
 1
 
 BUTTON
-546
-119
-651
-152
+573
+111
+678
+144
 advance time
 go
 T
@@ -1172,9 +1155,9 @@ NIL
 
 SLIDER
 4
-466
+432
 197
-499
+465
 par_featureAngleRange
 par_featureAngleRange
 0
@@ -1196,30 +1179,30 @@ algorithm-style
 0
 
 TEXTBOX
-11
-515
-175
-543
+13
+481
+177
+509
 used when algorithm-style = C#
 11
 0.0
 1
 
 TEXTBOX
-205
-395
-389
-423
+371
+481
+555
+509
 used when algorithm-style = Netlogo
 11
 0.0
 1
 
 INPUTBOX
-215
-414
-370
-474
+381
+500
+536
+560
 par_continentality
 0.5
 1

@@ -18,6 +18,8 @@
 ;;  You should have received a copy of the GNU General Public License
 ;;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+breed [ transectLines transectLine ]
+
 globals
 [
   maxDist
@@ -135,6 +137,12 @@ to setup
   set sdElevation standard-deviation [elevation] of patches
 
   paint-patches
+
+  setup-patch-coordinates-labels "bottom" "left"
+
+  setup-transect
+
+  update-transects
 
   update-plots
 
@@ -436,15 +444,130 @@ to refresh-view-after-seaLevel-change
   paint-patches
 
 end
+
+to setup-patch-coordinates-labels [ XcoordPosition YcoordPosition ]
+
+  let xspacing floor (world-width / patch-size)
+  let yspacing floor (world-height / patch-size)
+
+  ifelse (XcoordPosition = "bottom")
+  [
+    ask patches with [ pycor = min-pycor + 1 ]
+    [
+      if (pxcor mod xspacing = 0)
+      [ set plabel (word pxcor) ]
+    ]
+  ]
+  [
+    ask patches with [ pycor = max-pycor - 1 ]
+    [
+      if (pxcor mod xspacing = 0)
+      [ set plabel (word pxcor) ]
+    ]
+  ]
+
+  ifelse (YcoordPosition = "left")
+  [
+    ask patches with [ pxcor = min-pxcor + 1 ]
+    [
+      if (pycor mod yspacing = 0)
+      [ set plabel (word pycor) ]
+    ]
+  ]
+  [
+    ask patches with [ pycor = max-pycor - 1 ]
+    [
+      if (pycor mod yspacing = 0)
+      [ set plabel (word pycor) ]
+    ]
+  ]
+
+end
+
+to setup-transect
+
+  ask patches with [ pxcor = xTransect ]
+  [
+    sprout-transectLines 1 [ set shape "line" set heading 0 set color white ]
+  ]
+
+  ask patches with [ pycor = yTransect ]
+  [
+    sprout-transectLines 1 [ set shape "line" set heading 90 set color white ]
+  ]
+
+  if (not show-transects)
+  [
+    ask transectLines [ set hidden? true ]
+  ]
+
+end
+
+to update-transects
+
+  if (show-transects)
+  [
+    ask transectLines
+    [
+      ifelse (heading = 0) [ set xcor xTransect ] [ set ycor yTransect ]
+      set hidden? false
+    ]
+  ]
+
+end
+
+to plot-horizontal-transect
+
+  foreach (n-values world-width [ j -> min-pxcor + j ])
+  [
+    x ->
+    plotxy x ([elevation] of patch x yTransect)
+  ]
+  plot-pen-up
+
+end
+
+to plot-sea-level-horizontal-transect
+
+  foreach (n-values world-width [ j -> min-pxcor + j ])
+  [
+    x ->
+    plotxy x seaLevel
+  ]
+  plot-pen-up
+
+end
+
+to plot-vertical-transect
+
+  foreach (n-values world-height [ j -> min-pycor + j ])
+  [
+    y ->
+    plotxy ([elevation] of patch xTransect y) y
+  ]
+  plot-pen-up
+
+end
+
+to plot-sea-level-vertical-transect
+
+  foreach (n-values world-height [ j -> min-pycor + j ])
+  [
+    y ->
+    plotxy seaLevel y
+  ]
+  plot-pen-up
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-693
-10
-1261
-579
+728
+43
+1204
+520
 -1
 -1
-11.2
+9.36
 1
 10
 1
@@ -1074,6 +1197,104 @@ river-algorithm
 river-algorithm
 "lowest neighbor" "absolute downhill"
 0
+
+PLOT
+708
+514
+1204
+634
+Horizontal transect
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" "clear-plot\nset-plot-x-range (min-pxcor - 1) (max-pxcor + 1)\nset-plot-y-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
+PENS
+"default" 1.0 0 -16777216 true "" "plot-horizontal-transect"
+"pen-1" 1.0 0 -13345367 true "" "plot-sea-level-horizontal-transect"
+"pen-2" 1.0 0 -2674135 true "" "plotxy xTransect plot-y-max plotxy xTransect plot-y-min"
+
+SLIDER
+698
+39
+731
+517
+yTransect
+yTransect
+min-pycor
+max-pycor
+38.0
+1
+1
+NIL
+VERTICAL
+
+SLIDER
+725
+12
+1211
+45
+xTransect
+xTransect
+min-pxcor
+max-pxcor
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+PLOT
+1199
+43
+1359
+528
+vertical transect
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" "clear-plot\nset-plot-y-range (min-pycor - 1) (max-pycor + 1)\nset-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
+PENS
+"default" 1.0 0 -16777216 true "" "plot-vertical-transect"
+"pen-1" 1.0 0 -13345367 true "" "plot-sea-level-vertical-transect"
+"pen-2" 1.0 0 -2674135 true "" "plotxy  plot-x-max yTransect plotxy plot-x-min yTransect"
+
+BUTTON
+1230
+579
+1330
+612
+update transects
+update-transects\nupdate-plots
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SWITCH
+1220
+545
+1345
+578
+show-transects
+show-transects
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
