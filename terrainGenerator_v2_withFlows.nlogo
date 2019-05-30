@@ -41,6 +41,8 @@ globals
   ySlope
 
   flowWaterVolume
+  riverFlowAccumulation
+  minRiverLength
 
   moistureDiffusionSteps
   moistureTransferenceRate
@@ -51,6 +53,9 @@ globals
   minElevation
   sdElevation
   maxElevation
+
+  startRiverPatch
+  riverPathPoints
 ]
 
 patches-own
@@ -125,9 +130,20 @@ to setup
 
   reset-timer
 
-  fill-sinks
+  ;;; START - flow related procedures ;;;;;;;;;;;;;;;;;;;;;;;
 
-  print (word "fill-sinks computing time: " timer)
+  if (do-fill-sinks)
+  [
+    fill-sinks
+
+    print (word "fill-sinks computing time: " timer)
+
+    reset-timer
+  ]
+
+  set-flow-directions
+
+  print (word "set-flow-directions computing time: " timer)
 
   reset-timer
 
@@ -140,6 +156,8 @@ to setup
   diffuse-moisture
 
   print (word "diffuse-moisture computing time: " timer)
+
+  ;;; END - flow related procedures ;;;;;;;;;;;;;;;;;;;;;;;
 
   set landOceanRatio count patches with [elevation > seaLevel] / count patches
   set elevationDistribution [elevation] of patches
@@ -355,21 +373,13 @@ to fill-sinks
     ]
   ]
 
-  ask patches
-  [
-    let thisPatch self
-
-    let downstreamPatch max-one-of neighbors [get-drop-from thisPatch]
-    set flowDirection get-flow-direction-encoding ([pxcor] of downstreamPatch - pxcor) ([pycor] of downstreamPatch - pycor)
-  ]
-
 end
 
 to-report is-sink ; ego = patch
 
   let thisPatch self
 
-  report (not is-at-edge) and (count neighbors with [elevation < [elevation] of thisPatch] = 0)
+  report (not is-at-edge) and (elevation < min [elevation] of neighbors);count neighbors with [elevation < [elevation] of thisPatch] = 0)
 
 end
 
@@ -931,6 +941,33 @@ to-report flow-direction-is-loop ; ego = patch
 
 end
 
+to set-flow-directions
+
+  ask patches
+  [
+    ifelse (is-at-edge and self != startRiverPatch)
+    [
+      if ( pxcor = min-pxcor ) [ set flowDirection 32 ] ; west
+      if ( pxcor = max-pxcor ) [ set flowDirection 2 ] ; east
+      if ( pycor = min-pycor ) [ set flowDirection 8 ] ; south
+      if ( pycor = max-pycor ) [ set flowDirection 128 ] ; north
+    ]
+    [
+      set-flow-direction
+    ]
+  ]
+
+end
+
+to set-flow-direction ; ego = patch
+
+  let thisPatch self
+
+  let downstreamPatch max-one-of neighbors [get-drop-from thisPatch]
+  set flowDirection get-flow-direction-encoding ([pxcor] of downstreamPatch - pxcor) ([pycor] of downstreamPatch - pycor)
+
+end
+
 to set-flow-accumulations
 
   ; From Jenson, S. K., & Domingue, J. O. (1988), p. 1594
@@ -1073,7 +1110,7 @@ to paint-patches
 ;    ]
   ]
 
-  if (show-flows) [ display-flows ]
+  display-flows
 
 end
 
@@ -1084,23 +1121,46 @@ to display-flows
     ask patches [ sprout-flowHolders 1 [ set hidden? true ] ]
   ]
 
-  ask patches ;with [ has-flow-direction-code ]
+  ifelse (show-flows)
   [
-    let flowDirectionHere flowDirection
-    let nextPatchInFlow get-patch-in-flow-direction flowDirection
-    let flowAccumulationHere flowAccumulation
-
-    ask one-of flowHolders-here
+    ask patches ;with [ has-flow-direction-code ]
     [
-      if (link-with one-of [flowHolders-here] of nextPatchInFlow = nobody)
-      [ create-link-with one-of [flowHolders-here] of nextPatchInFlow ]
+      let flowDirectionHere flowDirection
+      let nextPatchInFlow get-patch-in-flow-direction flowDirection
+      let flowAccumulationHere flowAccumulation
 
-      ask link-with one-of [flowHolders-here] of nextPatchInFlow
+      ask one-of flowHolders-here
       [
-        let multiplier 1E20 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E20
-        set color 92 + (6 * multiplier)
-        set thickness 0.4 * ( 1 - ((color - 92) / 6))
+        ifelse (nextPatchInFlow != nobody)
+        [
+          if (link-with one-of [flowHolders-here] of nextPatchInFlow = nobody)
+          [ create-link-with one-of [flowHolders-here] of nextPatchInFlow ]
+
+          ask link-with one-of [flowHolders-here] of nextPatchInFlow
+          [
+            set hidden? false
+            let multiplier 1E20 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E20
+            set color 92 + (6 * multiplier)
+            set thickness 0.4 * ( 1 - ((color - 92) / 6))
+          ]
+        ]
+        [
+          set hidden? false
+          let multiplier 1E20 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E20
+          set color 92 + (6 * multiplier)
+          if (color <= 98) [ set shape "line half" ]
+          if (color < 96) [ set shape "line half 1" ]
+          if (color < 94) [ set shape "line half 2" ]
+          set heading get-angle-in-flow-direction flowDirection
+        ]
       ]
+    ]
+  ]
+  [
+    ask flowHolders
+    [
+      set hidden? true
+      ask my-links [ set hidden? true ]
     ]
   ]
 
@@ -1368,7 +1428,7 @@ INPUTBOX
 154
 70
 randomSeed
-5.0
+0.0
 1
 0
 Number
@@ -1423,7 +1483,7 @@ INPUTBOX
 96
 248
 par_numRanges
-3.0
+2.0
 1
 0
 Number
@@ -1445,7 +1505,7 @@ INPUTBOX
 95
 308
 par_numRifts
-2.0
+5.0
 1
 0
 Number
@@ -1528,7 +1588,7 @@ par_rangeAggregation
 par_rangeAggregation
 0
 1
-0.73
+1.0
 0.01
 1
 NIL
@@ -1543,7 +1603,7 @@ par_riftAggregation
 par_riftAggregation
 0
 1
-0.71
+1.0
 .01
 1
 NIL
@@ -1622,7 +1682,7 @@ NIL
 10.0
 true
 false
-"" "set-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
+"set-histogram-num-bars 100\nset-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)" "set-histogram-num-bars 100\nset-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
 PENS
 "default" 1.0 1 -16777216 true "" "histogram [elevation] of patches"
 "pen-1" 1.0 1 -2674135 true "" "histogram n-values plot-y-max [j -> seaLevel]"
@@ -1666,7 +1726,7 @@ par_featureAngleRange
 par_featureAngleRange
 0
 360
-30.0
+25.0
 1
 1
 º
@@ -1688,10 +1748,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-485
-158
-589
-203
+501
+206
+605
+251
 count river patches
 count patches with [ water > 0 ]
 0
@@ -1728,22 +1788,22 @@ par_xSlope
 par_xSlope
 -0.1
 0.1
--0.01
+0.01
 0.01
 1
 NIL
 HORIZONTAL
 
 SLIDER
-429
-201
-639
-234
+445
+249
+655
+282
 par_moistureDiffusionSteps
 par_moistureDiffusionSteps
 0
 100
-15.0
+100.0
 1
 1
 NIL
@@ -1767,15 +1827,15 @@ NIL
 1
 
 SLIDER
-429
-234
-640
-267
+445
+282
+656
+315
 par_moistureTransferenceRate
 par_moistureTransferenceRate
 0
 1
-0.05
+0.2
 0.01
 1
 NIL
@@ -1911,10 +1971,10 @@ show-transects
 -1000
 
 SLIDER
-423
-130
-666
-163
+433
+165
+676
+198
 par_flowWaterVolume
 par_flowWaterVolume
 0
@@ -1924,6 +1984,28 @@ par_flowWaterVolume
 1
 m^3 / patch
 HORIZONTAL
+
+SWITCH
+425
+129
+542
+162
+do-fill-sinks
+do-fill-sinks
+0
+1
+-1000
+
+SWITCH
+543
+129
+668
+162
+do-add-river
+do-add-river
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -2128,17 +2210,17 @@ true
 0
 Line -7500403 true 150 0 150 150
 
-line1
+line half 1
 true
 0
 Line -7500403 true 150 0 150 300
-Rectangle -7500403 true true 135 0 165 300
+Rectangle -7500403 true true 135 0 165 150
 
-line2
+line half 2
 true
 0
 Line -7500403 true 150 0 150 300
-Rectangle -7500403 true true 120 0 180 300
+Rectangle -7500403 true true 120 0 180 150
 
 pentagon
 false
