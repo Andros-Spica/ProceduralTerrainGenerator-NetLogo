@@ -64,11 +64,7 @@ patches-own
   flowDirection
   receivesFlow flowAccumulationState
   flowAccumulation
-  watershedID
-  pourPointWithWatershed
-  isLowestPourPoint
-  ;downstreamPatch
-  streamLevel
+  ;watershedID pourPointWithWatershed isLowestPourPoint
   water
   moisture
   tempMoisture
