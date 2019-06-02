@@ -344,13 +344,16 @@ end
 
 to update-transects
 
-  if (show-transects)
+    ifelse (show-transects)
   [
     ask transectLines
     [
       ifelse (heading = 0) [ set xcor xTransect ] [ set ycor yTransect ]
       set hidden? false
     ]
+  ]
+  [
+    ask transectLines [ set hidden? true ]
   ]
 
 end
