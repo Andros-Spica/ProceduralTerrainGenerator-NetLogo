@@ -40,8 +40,12 @@ globals
   xSlope
   ySlope
 
+  valleyAxisInclination
+  valleySlope
+
+  flowAccumulationPerPatch
   flowWaterVolume
-  riverFlowAccumulation
+  riverFlowAccumulationAtStart
   minRiverLength
 
   moistureDiffusionSteps
@@ -78,6 +82,8 @@ to setup
 
   clear-all
 
+  print (word "=====RUN " date-and-time "=================================================")
+
   set patchArea 10000 ; 10,000 m^2 = 1 hectare
   set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
 
@@ -94,7 +100,12 @@ to setup
   set xSlope par_xSlope
   set ySlope par_ySlope
 
+  set valleyAxisInclination par_valleyAxisInclination
+  set valleySlope par_valleySlope
+
+  set flowAccumulationPerPatch par_flowAccumulationPerPatch
   set flowWaterVolume par_flowWaterVolume
+  set riverFlowAccumulationAtStart par_riverFlowAccumulationAtStart
   set moistureDiffusionSteps par_moistureDiffusionSteps
   set moistureTransferenceRate par_moistureTransferenceRate
 
@@ -120,9 +131,15 @@ to setup
 
   reset-timer
 
-  set-xySlopes
+  set-xySlope
 
   print (word "set-xySlopes computing time: " timer)
+
+  reset-timer
+
+  set-valleySlope
+
+  print (word "set-valleySlopes computing time: " timer)
 
   reset-timer
 
@@ -326,7 +343,7 @@ to smooth-elevation
 
 end
 
-to set-xySlopes
+to set-xySlope
 
   ask patches
   [
@@ -344,6 +361,32 @@ to set-xySlopes
     [
       set elevation elevation + (ySlope * (maxElevation - elevation) * (pycor - (world-height / 2)))
     ]
+  ]
+
+end
+
+to set-valleySlope
+
+  ; bend terrain as a valley (valleySlope > 0) or a ridge (valleySlope < 0) following a North-South pattern
+  ask patches
+  [
+    let xValley (world-width / 2) + valleyAxisInclination * (pycor - (world-height / 2))
+    set elevation elevation + (valleySlope * (maxElevation - elevation) * abs (xValley - pxcor))
+  ]
+
+  ; find which edge has the lower average elevation
+  let highestEdge patches with [pycor = max-pycor] ; north
+  if (mean [elevation] of highestEdge < mean [elevation] of patches with [pycor = min-pycor])
+  [ set highestEdge patches with [pycor = min-pycor] ] ; south
+
+  ; give an arbitrarily, ridiculously high value (riverFlowAccumulationAtStart) of flowAccumulation to the lowest patch at that edge
+  ; assign it an inward flowDirection (set-flowDirection will not overwrite this)
+  ask min-one-of highestEdge [elevation] ; a patch at the bottom of the valley
+  [
+    print self
+    set flowAccumulation riverFlowAccumulationAtStart
+    let downstreamPatch min-one-of neighbors with [not is-at-edge] [elevation]
+    set flowDirection get-flow-direction-encoding ([pxcor] of downstreamPatch - pxcor) ([pycor] of downstreamPatch - pycor)
   ]
 
 end
@@ -939,7 +982,7 @@ end
 
 to set-flow-directions
 
-  ask patches
+  ask patches with [ flowDirection = 0 ]
   [
     ifelse (is-at-edge and self != startRiverPatch)
     [
@@ -1004,23 +1047,27 @@ to set-flow-accumulations
     ask one-of patches with [flowAccumulationState = "start"]
     [
       let downstreamPatch get-patch-in-flow-direction flowDirection
-      let nextFlowAccumulation flowAccumulation + 1
+      let nextFlowAccumulation flowAccumulation + flowAccumulationPerPatch
+
+      set flowAccumulationState "done"
+      ;set pcolor orange
 
       if (downstreamPatch != nobody)
       [
         ask downstreamPatch
         [
           set flowAccumulation flowAccumulation + nextFlowAccumulation
-          if (count neighbors with [get-patch-in-flow-direction flowDirection = downstreamPatch and flowAccumulationState = "pending"] = 0)
+          if (count neighbors with [
+            get-patch-in-flow-direction flowDirection = downstreamPatch and
+            (flowAccumulationState = "pending" or flowAccumulationState = "start")
+            ] = 0
+          )
           [
             set flowAccumulationState "start"
             ;set pcolor red
           ]
         ]
       ]
-
-      set flowAccumulationState "done"
-      ;set pcolor orange
     ]
 
     set maxIterations maxIterations - 1
@@ -1041,15 +1088,15 @@ end
 
 to diffuse-moisture
 
-  ask patches [ set moisture 0 ]
+  ask patches [ set water 0 set moisture 0 ]
 
-  ; assign water volume per patch under sealevel
+  ; assign water volume per patch under sea/inundation level
   ask patches with [ elevation < seaLevel ] [ set water (seaLevel - elevation) * patchArea ]
 
-  ; assign water volume per patch according to streamLevel
+  ; assign water volume per patch according to flowAccumulation
   ask patches with [ elevation >= seaLevel and flowAccumulation > 0 ] [ set water flowWaterVolume * flowAccumulation ]
 
-  ; calculate moisture from water volumes (including rivers)
+  ; calculate moisture from water volumes
   ask patches with [ water > 0 ] [ set moisture water ]
 
   repeat moistureDiffusionSteps
@@ -1097,7 +1144,7 @@ to paint-patches
     ]
     if (display-mode = "moisture")
     [
-      set pcolor 92 + (7 * 1E20 ^ (1 - moisture / (max [moisture] of patches)) / 1E20)
+      set pcolor 92 + (7 * 1E100 ^ (1 - moisture / (max [moisture] of patches)) / 1E100)
     ]
 ;    if (display-mode = "watersheds")
 ;    [
@@ -1135,18 +1182,18 @@ to display-flows
           ask link-with one-of [flowHolders-here] of nextPatchInFlow
           [
             set hidden? false
-            let multiplier 1E20 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E20
-            set color 92 + (6 * multiplier)
-            set thickness 0.4 * ( 1 - ((color - 92) / 6))
+            let multiplier 1E100 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E100
+            set color 92 + (5 * multiplier)
+            set thickness 0.4 * ( 1 - ((color - 92) / 5))
           ]
         ]
         [
           set hidden? false
-          let multiplier 1E20 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E20
-          set color 92 + (6 * multiplier)
-          if (color <= 98) [ set shape "line half" ]
-          if (color < 96) [ set shape "line half 1" ]
-          if (color < 94) [ set shape "line half 2" ]
+          let multiplier 1E100 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E100
+          set color 92 + (5 * multiplier)
+          if (color <= 97) [ set shape "line half" ]
+          if (color < 95) [ set shape "line half 1" ]
+          if (color < 93) [ set shape "line half 2" ]
           set heading get-angle-in-flow-direction flowDirection
         ]
       ]
@@ -1263,13 +1310,16 @@ end
 
 to update-transects
 
-  if (show-transects)
+  ifelse (show-transects)
   [
     ask transectLines
     [
       ifelse (heading = 0) [ set xcor xTransect ] [ set ycor yTransect ]
       set hidden? false
     ]
+  ]
+  [
+    ask transectLines [ set hidden? true ]
   ]
 
 end
@@ -1363,10 +1413,10 @@ NIL
 1
 
 MONITOR
-560
-490
-661
-535
+563
+446
+664
+491
 NIL
 landOceanRatio
 4
@@ -1404,10 +1454,10 @@ m
 HORIZONTAL
 
 SLIDER
-186
-118
-368
-151
+184
+86
+366
+119
 par_elevationSmoothStep
 par_elevationSmoothStep
 0
@@ -1424,7 +1474,7 @@ INPUTBOX
 154
 70
 randomSeed
-0.0
+6.0
 1
 0
 Number
@@ -1441,10 +1491,10 @@ par_continentality
 Number
 
 MONITOR
-398
-547
-496
-592
+401
+503
+499
+548
 sdElevation
 precision sdElevation 4
 4
@@ -1452,10 +1502,10 @@ precision sdElevation 4
 11
 
 MONITOR
-495
-547
-577
-592
+498
+503
+580
+548
 minElevation
 precision minElevation 4
 4
@@ -1463,10 +1513,10 @@ precision minElevation 4
 11
 
 MONITOR
-571
-547
-658
-592
+574
+503
+661
+548
 maxElevation
 precision maxElevation 4
 4
@@ -1565,10 +1615,10 @@ m
 HORIZONTAL
 
 MONITOR
-398
-490
-483
-535
+401
+446
+486
+491
 NIL
 count patches
 0
@@ -1576,10 +1626,10 @@ count patches
 11
 
 SLIDER
-208
-391
-362
-424
+206
+399
+360
+432
 par_rangeAggregation
 par_rangeAggregation
 0
@@ -1591,10 +1641,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-208
-424
-362
-457
+206
+432
+360
+465
 par_riftAggregation
 par_riftAggregation
 0
@@ -1606,10 +1656,10 @@ NIL
 HORIZONTAL
 
 INPUTBOX
-190
-333
-297
-393
+188
+341
+295
+401
 par_numContinents
 1.0
 1
@@ -1617,10 +1667,10 @@ par_numContinents
 Number
 
 INPUTBOX
-297
-333
-389
-393
+295
+341
+387
+401
 par_numOceans
 1.0
 1
@@ -1628,10 +1678,10 @@ par_numOceans
 Number
 
 SLIDER
-186
-151
-367
 184
+119
+365
+152
 par_smoothingNeighborhood
 par_smoothingNeighborhood
 0
@@ -1643,10 +1693,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-488
-490
-553
-535
+491
+446
+556
+491
 maxDist
 precision maxDist 4
 4
@@ -1654,11 +1704,11 @@ precision maxDist 4
 11
 
 MONITOR
-222
-184
-319
-221
-neighborhood size
+202
+151
+351
+188
+smoothing neighborhood size
 (word (count patches with [ distance patch 0 0 < smoothingNeighborhood ] - 1) \" patches\")
 0
 1
@@ -1694,10 +1744,10 @@ algorithm-style
 1
 
 TEXTBOX
-246
-322
-396
-340
+244
+330
+394
+348
 used when algorithm-style = C#
 9
 0.0
@@ -1729,30 +1779,30 @@ par_featureAngleRange
 HORIZONTAL
 
 SLIDER
-195
-263
-366
-296
+192
+223
+388
+256
 par_ySlope
 par_ySlope
 -0.1
 0.1
 0.01
-0.01
+0.001
 1
 NIL
 HORIZONTAL
 
 MONITOR
-501
-206
-605
-251
-count river patches
-count patches with [ water > 0 ]
+408
+556
+561
+593
+count patches with water > 100
+count patches with [ water > 100 ]
 0
 1
-11
+9
 
 SWITCH
 305
@@ -1776,25 +1826,25 @@ display-mode
 1
 
 SLIDER
-196
-229
-366
-262
+192
+190
+388
+223
 par_xSlope
 par_xSlope
 -0.1
 0.1
-0.01
-0.01
+0.0
+0.001
 1
 NIL
 HORIZONTAL
 
 SLIDER
-445
-249
-655
-282
+436
+312
+646
+345
 par_moistureDiffusionSteps
 par_moistureDiffusionSteps
 0
@@ -1823,10 +1873,10 @@ NIL
 1
 
 SLIDER
-445
-282
-656
-315
+436
+345
+647
+378
 par_moistureTransferenceRate
 par_moistureTransferenceRate
 0
@@ -1838,10 +1888,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-464
-439
-582
-484
+568
+550
+654
+595
 total moisture
 sum [moisture] of patches
 2
@@ -1849,20 +1899,20 @@ sum [moisture] of patches
 11
 
 TEXTBOX
-194
-95
-265
-120
+157
+69
+228
+94
 ELEVATION
 11
 0.0
 1
 
 TEXTBOX
-460
-110
-610
-128
+482
+130
+632
+148
 WATER & SOIL MOISTURE
 11
 0.0
@@ -1897,7 +1947,7 @@ yTransect
 yTransect
 min-pycor
 max-pycor
-0.0
+49.0
 1
 1
 NIL
@@ -1967,10 +2017,10 @@ show-transects
 -1000
 
 SLIDER
-433
-165
-676
-198
+420
+219
+663
+252
 par_flowWaterVolume
 par_flowWaterVolume
 0
@@ -1982,26 +2032,71 @@ m^3 / patch
 HORIZONTAL
 
 SWITCH
-425
-129
-542
-162
+484
+148
+601
+181
 do-fill-sinks
 do-fill-sinks
 0
 1
 -1000
 
-SWITCH
-543
-129
-668
-162
-do-add-river
-do-add-river
+SLIDER
+192
+258
+387
+291
+par_valleyAxisInclination
+par_valleyAxisInclination
+0
 1
+0.08
+0.01
 1
--1000
+NIL
+HORIZONTAL
+
+SLIDER
+192
+291
+387
+324
+par_valleySlope
+par_valleySlope
+-0.1
+0.1
+0.01
+0.001
+1
+NIL
+HORIZONTAL
+
+SLIDER
+432
+186
+652
+219
+par_flowAccumulationPerPatch
+par_flowAccumulationPerPatch
+0
+2
+1.0
+0.001
+1
+NIL
+HORIZONTAL
+
+INPUTBOX
+454
+253
+634
+313
+par_riverFlowAccumulationAtStart
+100000.0
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?
