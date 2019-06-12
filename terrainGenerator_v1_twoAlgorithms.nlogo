@@ -27,10 +27,20 @@ globals
   ;;; parameters (copies) ===============================================================
   numContinents
   numOceans
+
   numRanges
   rangeLength
+  rangeElevation
+  rangeAggregation
+
   numRifts
   riftLength
+  riftElevation
+  riftAggregation
+
+  featureAngleRange
+  continentality
+  elevationNoise
   seaLevel
   elevationSmoothStep
   smoothingNeighborhood
@@ -50,29 +60,11 @@ breed [ mapSetters mapSetter ]
 
 mapSetters-own [ points ]
 
-to setup
+to create-terrain
 
   clear-all
 
-  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
-
-  set numContinents par_numContinents
-  set numOceans par_numOceans
-
-  set numRanges par_numRanges
-  set rangeLength round ( par_rangeLength * maxDist)
-  set maxElevation par_maxElevation
-  set numRifts par_numRifts
-  set riftLength round ( par_riftLength * maxDist)
-  set minElevation par_minElevation
-
-  ;set continentality (par_continentality * (count patches / 2))
-
-  set seaLevel par_seaLevel
-  set elevationSmoothStep par_elevationSmoothStep
-  set smoothingNeighborhood par_smoothingNeighborhood * maxDist
-
-  random-seed randomSeed
+  set-parameters
 
   reset-timer
 
@@ -84,7 +76,7 @@ to setup
     set-landform-Csharp
   ]
 
-  print (word "Computing time: " timer)
+  print (word algorithm-style " computing time: " timer)
 
   set landOceanRatio count patches with [elevation > seaLevel] / count patches
   set elevationDistribution [elevation] of patches
@@ -104,7 +96,79 @@ to setup
 
 end
 
-to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
+to set-parameters
+
+  random-seed randomSeed
+
+  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
+
+  ;parameters-check-1
+
+  if (type-of-experiment = "user-defined")
+  [
+    ;;; load parameters from user interface
+    set numContinents par_numContinents
+    set numOceans par_numOceans
+
+    set numRanges par_numRanges
+    set rangeLength round ( par_rangeLength * maxDist)
+    set rangeElevation par_rangeElevation
+    set rangeAggregation par_rangeAggregation
+
+    set numRifts par_numRifts
+    set riftLength round ( par_riftLength * maxDist)
+    set riftElevation par_riftElevation
+    set riftAggregation par_riftAggregation
+
+    set elevationNoise par_elevationNoise
+
+    set featureAngleRange par_featureAngleRange
+
+    set continentality par_continentality * count patches
+
+    set elevationSmoothStep par_elevationSmoothStep
+    set smoothingNeighborhood par_smoothingNeighborhood * maxDist
+
+    set seaLevel par_seaLevel
+  ]
+
+  if (type-of-experiment = "random") ; TODO
+  [
+    ;;; get random values within an arbitrary (reasonable) range of values
+    ;;; this depends on what type and scale of terrain you want
+    ;;; Here, our aim is to create a global-scale terrain (horizontal wrap or cylinder)
+    set numContinents 1 + random 10
+    set numOceans 1 + random 10
+
+    set numRanges 1 + random 100
+    set rangeLength round ( (random-float 1) * maxDist)
+    set rangeElevation random-float 5000
+    set rangeAggregation random-float 0.5
+
+    set numRifts 1 + random 100
+    set riftLength round ( (random-float 1) * maxDist)
+    set riftElevation -1 * random-float 5000
+    set riftAggregation random-float 0.5
+
+    set elevationNoise random-float 1
+
+    set featureAngleRange random-float 30
+
+    set continentality (random-float 2) * count patches
+
+    set elevationSmoothStep 1 ; not randomised
+    set smoothingNeighborhood 0.03 * maxDist ; not randomised
+
+    set seaLevel 0 ; riftElevation + (random-float (rangeElevation - riftElevation))
+  ]
+  if (type-of-experiment = "defined by experiment-number")
+  [
+    ;load-experiment
+  ]
+
+end
+
+to set-landform-NetLogo ;[ riftElevation rangeElevation numRanges rangeLength numRifts riftLength continentality smoothingNeighborhood elevationSmoothStep]
 
   ; Netlogo-like code
   ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
@@ -116,19 +180,18 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
     ask one-of mapSetters
     [
       let sign 1
-      let scale maxElevation
-      if ( points < 0 ) [ set sign -1 set scale minElevation ]
+      let scale rangeElevation
+      if ( points < 0 ) [ set sign -1 set scale riftElevation ]
       ask patch-here [ set elevation scale ]
       set points points - sign
       if (points = 0) [die]
-      rt (random-exponential par_featureAngleRange) * (1 - random-float 2)
+      rt (random-exponential featureAngleRange) * (1 - random-float 2)
       forward 1
     ]
   ]
 
   smooth-elevation
 
-  let continentality par_continentality * count patches
   let underWaterPatches patches with [elevation < 0]
   let aboveWaterPatches patches with [elevation > 0]
 
@@ -150,7 +213,7 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
 
 end
 
-to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
+to set-landform-Csharp ;[ riftElevation rangeElevation elevationNoise numContinents numRanges rangeLength rangeAggregation numOceans numRifts riftLength riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -161,8 +224,8 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
   let continents n-of numContinents patches
   let oceans n-of numOceans patches
 
-  let maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist
-  let maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist
+  let maxDistBetweenRanges (1.1 - rangeAggregation) * maxDist
+  let maxDistBetweenRifts (1.1 - riftAggregation) * maxDist
 
   repeat (numRanges + numRifts)
   [
@@ -174,14 +237,14 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
     [
       set numRifts numRifts - 1
       set len riftLength - 2
-      set elev minElevation
+      set elev riftElevation
       ;ifelse (any? patches with [elevation < 0]) [set p0 one-of patches with [elevation < 0]] [set p0 one-of patches]
       set p1 one-of patches with [ distance one-of oceans < maxDistBetweenRifts ]
     ]
     [
       set numRanges numRanges - 1
       set len rangeLength - 2
-      set elev maxElevation
+      set elev rangeElevation
       set p1 one-of patches with [ distance one-of continents < maxDistBetweenRanges ]
     ]
 
@@ -192,7 +255,7 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
 
   ask patches with [elevation = 0]
   [
-    set elevation random-normal 0 par_sdElevation
+    set elevation random-normal 0 elevationNoise
   ]
 
   smooth-elevation
@@ -228,7 +291,7 @@ to draw-elevation-pattern [ p1 len elev ]
 
   repeat len
   [
-    set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
+    set directionAngle directionAngle + (random-exponential featureAngleRange) * (1 - random-float 2)
     set directionAngle directionAngle mod 360
 
     set p1 p2
@@ -401,6 +464,65 @@ to plot-sea-level-vertical-transect
   plot-pen-up
 
 end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; FILE HANDLING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to export-random-terrain
+
+  set randomSeed randomSeed + 1 ; this allows for creating multiple terrains when executing this procedure continuosly
+
+  create-terrain
+
+  export-terrain
+
+end
+
+to export-terrain
+
+  set show-transects false
+
+  update-transects
+
+  ;;; build a file name as unique to this setting as possible
+  let filePath (word "terrains//terrainGenerator_v1_" type-of-experiment "_w=" world-width "_h=" world-height "_a=" algorithm-style "_seed=" randomSeed)
+
+  if (type-of-experiment = "user-defined") [ set filePath (word filePath "_" date-and-time) ]
+  ;if (type-of-experiment = "defined by expNumber") [set filePath (word filePath "_" expNumber) ]
+
+  ;print filePath print length filePath ; de-bug print
+
+;;; check that filePath does not exceed 100 (not common in this context)
+  if (length filePath > 100) [ print "WARNING: file path may be too long, depending on your current directory. Decrease length of file name or increase the limit." set filePath substring filePath 0 100 ]
+
+  let filePathCSV (word filePath ".csv")
+
+  let filePathPNG (word filePath ".png")
+
+  export-view filePathPNG
+  export-world filePathCSV
+
+end
+
+to import-terrain
+
+  ;;; build a unique file name according to the user setting
+  let filePath (word "terrains//terrainGenerator_v1_" type-of-experiment "_w=" world-width "_h=" world-height "_a=" algorithm-style "_seed=" randomSeed)
+
+  if (type-of-experiment = "user-defined") [ set filePath (word filePath "_" date-and-time) ]
+  ;if (type-of-experiment = "defined by expNumber") [set filePath (word filePath "_" expNumber) ]
+
+  ;;; check that filePath does not exceed 100 (not common in this context)
+  if (length filePath > 100) [ print "WARNING: file path may be too long, depending on your current directory. Decrease length of file name or increase the limit." set filePath substring filePath 0 100 ]
+
+  set filePath (word filePath ".csv")
+
+  ifelse (file-exists? filePath)
+  [ import-world filePath ]
+  [ print (word "WARNING: could not find '" filePath "'") ]
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 408
@@ -432,25 +554,25 @@ ticks
 BUTTON
 9
 10
-68
+76
 57
-NIL
-setup
+create
+create-terrain
 NIL
 1
 T
 OBSERVER
 NIL
-NIL
+1
 NIL
 NIL
 1
 
 MONITOR
-213
-525
-314
-570
+160
+619
+261
+664
 NIL
 landOceanRatio
 4
@@ -458,27 +580,27 @@ landOceanRatio
 11
 
 SLIDER
-180
-10
-352
-43
+195
+114
+367
+147
 par_seaLevel
 par_seaLevel
-min (list minElevation par_minElevation)
-min (list maxElevation par_maxElevation)
--5.0
+min (list minElevation par_riftElevation)
+min (list maxElevation par_rangeElevation)
+-12.0
 1
 1
 m
 HORIZONTAL
 
 SLIDER
-3
-130
-175
-163
-par_sdElevation
-par_sdElevation
+13
+217
+188
+250
+par_elevationNoise
+par_elevationNoise
 1
 5000
 801.0
@@ -488,10 +610,10 @@ m
 HORIZONTAL
 
 SLIDER
-176
-81
-358
-114
+191
+190
+373
+223
 par_elevationSmoothStep
 par_elevationSmoothStep
 0
@@ -503,21 +625,21 @@ NIL
 HORIZONTAL
 
 INPUTBOX
-235
-189
-311
-249
+276
+10
+352
+70
 randomSeed
-1.0
+8.0
 1
 0
 Number
 
 INPUTBOX
-223
-268
-324
-328
+234
+364
+335
+424
 par_continentality
 0.5
 1
@@ -525,10 +647,10 @@ par_continentality
 Number
 
 MONITOR
-53
-573
-151
-618
+9
+665
+107
+710
 sdElevation
 precision sdElevation 4
 4
@@ -536,10 +658,10 @@ precision sdElevation 4
 11
 
 MONITOR
-149
-573
-231
-618
+107
+665
+189
+710
 minElevation
 precision minElevation 4
 4
@@ -547,10 +669,10 @@ precision minElevation 4
 11
 
 MONITOR
-227
-573
-314
-618
+185
+665
+272
+710
 maxElevation
 precision maxElevation 4
 4
@@ -558,10 +680,10 @@ precision maxElevation 4
 11
 
 INPUTBOX
-6
-167
-94
-227
+14
+261
+102
+321
 par_numRanges
 50.0
 1
@@ -569,10 +691,10 @@ par_numRanges
 Number
 
 INPUTBOX
-93
-167
-185
-227
+103
+261
+195
+321
 par_rangeLength
 0.2
 1
@@ -580,10 +702,10 @@ par_rangeLength
 Number
 
 INPUTBOX
-6
-227
-93
-287
+14
+321
+101
+381
 par_numRifts
 50.0
 1
@@ -591,10 +713,10 @@ par_numRifts
 Number
 
 INPUTBOX
-93
-227
-185
-287
+103
+321
+195
+381
 par_riftLength
 0.5
 1
@@ -602,12 +724,12 @@ par_riftLength
 Number
 
 SLIDER
-3
-64
-175
-97
-par_minElevation
-par_minElevation
+13
+151
+185
+184
+par_riftElevation
+par_riftElevation
 -5000
 0
 -5000.0
@@ -617,10 +739,10 @@ m
 HORIZONTAL
 
 BUTTON
+197
+147
+369
 180
-43
-352
-76
 refresh after changing sea level
 refresh-after-seaLevel-change
 NIL
@@ -634,12 +756,12 @@ NIL
 1
 
 SLIDER
-3
-97
-175
-130
-par_maxElevation
-par_maxElevation
+13
+184
+191
+217
+par_rangeElevation
+par_rangeElevation
 0
 5000
 5000.0
@@ -649,10 +771,10 @@ m
 HORIZONTAL
 
 MONITOR
-52
-525
-137
-570
+10
+619
+95
+664
 NIL
 count patches
 0
@@ -660,40 +782,40 @@ count patches
 11
 
 SLIDER
-203
-335
-357
-368
+211
+432
+365
+465
 par_rangeAggregation
 par_rangeAggregation
 0
 1
-0.75
+0.67
 0.01
 1
 NIL
 HORIZONTAL
 
 SLIDER
-203
-368
-357
-401
+211
+465
+365
+498
 par_riftAggregation
 par_riftAggregation
 0
 1
-0.21
+0.38
 .01
 1
 NIL
 HORIZONTAL
 
 INPUTBOX
-5
-342
-112
-402
+11
+439
+118
+499
 par_numContinents
 3.0
 1
@@ -701,10 +823,10 @@ par_numContinents
 Number
 
 INPUTBOX
-112
-342
-204
-402
+120
+439
+212
+499
 par_numOceans
 10.0
 1
@@ -712,10 +834,10 @@ par_numOceans
 Number
 
 SLIDER
-176
-114
-357
-147
+191
+223
+372
+256
 par_smoothingNeighborhood
 par_smoothingNeighborhood
 0
@@ -727,10 +849,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-142
-525
-207
-570
+96
+619
+161
+664
 maxDist
 precision maxDist 4
 4
@@ -738,10 +860,10 @@ precision maxDist 4
 11
 
 MONITOR
-212
-147
-309
-184
+227
+256
+324
+293
 neighborhood size
 (word (count patches with [ distance patch 0 0 < smoothingNeighborhood ] - 1) \" patches\")
 0
@@ -749,10 +871,10 @@ neighborhood size
 9
 
 PLOT
-3
-403
-359
-523
+11
+500
+367
+620
 Elevation per patch
 m
 NIL
@@ -768,40 +890,40 @@ PENS
 "pen-1" 1.0 1 -2674135 true "" "histogram n-values plot-y-max [j -> seaLevel]"
 
 CHOOSER
-76
-10
-168
-55
+240
+299
+332
+344
 algorithm-style
 algorithm-style
 "NetLogo" "C#"
 1
 
 TEXTBOX
-61
-331
-211
-349
+69
+428
+219
+446
 used when algorithm-style = C#
 9
 0.0
 1
 
 TEXTBOX
-200
-257
-366
-279
+211
+353
+377
+375
 used when algorithm-style = Netlogo
 9
 0.0
 1
 
 SLIDER
-5
-287
-185
-320
+15
+381
+195
+414
 par_featureAngleRange
 par_featureAngleRange
 0
@@ -904,9 +1026,70 @@ SWITCH
 519
 show-transects
 show-transects
-0
+1
 1
 -1000
+
+BUTTON
+8
+65
+118
+98
+NIL
+export-terrain
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+120
+65
+228
+98
+NIL
+import-terrain
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+CHOOSER
+89
+10
+263
+55
+type-of-experiment
+type-of-experiment
+"random" "user-defined" "defined by expNumber"
+0
+
+BUTTON
+17
+104
+189
+137
+export-random-terrain (100x)
+repeat 100 [ export-random-terrain ]
+NIL
+1
+T
+OBSERVER
+NIL
+9
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?

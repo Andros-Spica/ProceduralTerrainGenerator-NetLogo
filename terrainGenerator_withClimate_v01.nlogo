@@ -20,6 +20,7 @@
 
 globals
 [
+  patchArea
   maxDist
 
   ;;; parameters (copies) ===============================================================
@@ -27,13 +28,30 @@ globals
   ;;;; elevation
   numContinents
   numOceans
+
   numRanges
   rangeLength
+  rangeElevation
+  rangeAggregation
+
   numRifts
   riftLength
+  riftElevation
+  riftAggregation
+
+  featureAngleRange
+  continentality
+  elevationNoise
   seaLevel
   elevationSmoothStep
   smoothingNeighborhood
+
+  ;;;; flow accumulation and moisture
+  flowAccumulationPerPatch
+  flowWaterVolume
+
+  moistureDiffusionSteps
+  moistureTransferenceRate
 
   ;;;; slope
   meanSlope
@@ -42,6 +60,7 @@ globals
   ;;;; latitude
   axisGridInDegrees
   yearLenghtInDays
+  initialDayInYear
 
   ;;;; temperature
   polarLatitude
@@ -68,6 +87,12 @@ globals
 patches-own
 [
   elevation
+  flowDirection
+  receivesFlow flowAccumulationState
+  flowAccumulation
+  water
+  moisture
+  tempMoisture
   slope
   latitude latitudeRegion
   windDirection sunAngle temperature
@@ -75,43 +100,19 @@ patches-own
 
 breed [ mapSetters mapSetter ]
 
+breed [ flowHolders flowHolder ]
+
 breed [ windIndicators windIndicator ]
 
 mapSetters-own [ points ]
 
-to setup
+to create-terrain
 
   clear-all
 
-  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
+  print (word "=====RUN " date-and-time "=================================================")
 
-  set numContinents par_numContinents ; 3
-  set numOceans par_numOceans ; 10
-
-  set numRanges par_numRanges ; 50
-  set rangeLength round ( par_rangeLength * maxDist) ; 0.2
-  set maxElevation par_maxElevation ; 5000 m
-  set numRifts par_numRifts ; 50
-  set riftLength round ( par_riftLength * maxDist) ; 0.5
-  set minElevation par_minElevation ; -5000 m
-  set seaLevel par_seaLevel ; 0 m
-  set SdElevation par_SdElevation ; 800 m
-  set elevationSmoothStep par_elevationSmoothStep ; 1
-  set smoothingNeighborhood par_smoothingNeighborhood * maxDist ; 0.03 (3% of maxDist)
-
-  set meanSlope par_meanSlope
-  set stdDevSlope par_stdDevSlope
-  set axisGridInDegrees par_axisGridInDegrees
-  set currentDayInYear par_initialDayInYear
-  set yearLenghtInDays par_yearLenghtInDays
-  set polarLatitude par_polarLatitude
-  set tropicLatitude par_tropicLatitude
-  set minTemperatureAtSeaLevel par_minTemperatureAtSeaLevel
-  set maxTemperatureAtSeaLevel par_maxTemperatureAtSeaLevel
-  set temperatureDecreaseByElevation par_temperatureDecreaseByElevation
-  set temperatureDecreaseBySlope par_temperatureDecreaseBySlope
-
-  random-seed randomSeed
+  set-parameters
 
   reset-timer
 
@@ -124,6 +125,24 @@ to setup
   ]
 
   print (word "Terrain computing time: " timer)
+
+  set-flow-directions
+
+  print (word "set-flow-directions computing time: " timer)
+
+  reset-timer
+
+  set-flow-accumulations
+
+  print (word "set-flow-accumulations computing time: " timer)
+
+  reset-timer
+
+  diffuse-moisture
+
+  print (word "diffuse-moisture computing time: " timer)
+
+  reset-timer
 
   setup-latitude-and-windDirections
   update-climate
@@ -143,7 +162,156 @@ to setup
 
 end
 
-to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRifts riftLength par_continentality smoothingNeighborhood elevationSmoothStep]
+
+to set-parameters
+
+  random-seed randomSeed
+
+  set patchArea 1E6 ; 1,000,000 m^2 = 1 km^2
+  set maxDist (sqrt (( (max-pxcor - min-pxcor) ^ 2) + ((max-pycor - min-pycor) ^ 2)) / 2)
+
+  ;parameters-check-1
+
+  if (type-of-experiment = "user-defined")
+  [
+    ;;; load parameters from user interface
+    set numContinents par_numContinents ; 3
+    set numOceans par_numOceans ; 10
+
+    set numRanges par_numRanges ; 50
+    set rangeLength round ( par_rangeLength * maxDist) ; 0.2
+    set rangeElevation par_rangeElevation ; 5000 m
+    set rangeAggregation par_rangeAggregation
+
+    set numRifts par_numRifts ; 50
+    set riftLength round ( par_riftLength * maxDist) ; 0.5
+    set riftElevation par_riftElevation ; -5000 m
+    set riftAggregation par_riftAggregation
+
+    set elevationNoise par_elevationNoise ; 800 m
+
+    set featureAngleRange par_featureAngleRange
+
+    set continentality par_continentality * count patches
+
+    set elevationSmoothStep par_elevationSmoothStep ; 1
+    set smoothingNeighborhood par_smoothingNeighborhood * maxDist ; 0.03 (3% of maxDist)
+
+    set seaLevel par_seaLevel
+
+    set flowAccumulationPerPatch par_flowAccumulationPerPatch
+    set flowWaterVolume par_flowWaterVolume
+    set moistureDiffusionSteps par_moistureDiffusionSteps
+    set moistureTransferenceRate par_moistureTransferenceRate
+
+    set meanSlope par_meanSlope
+    set stdDevSlope par_stdDevSlope
+
+    set axisGridInDegrees par_axisGridInDegrees
+    set yearLenghtInDays par_yearLenghtInDays
+    set initialDayInYear par_initialDayInYear
+    set polarLatitude par_polarLatitude
+    set tropicLatitude par_tropicLatitude
+
+    set minTemperatureAtSeaLevel par_minTemperatureAtSeaLevel
+    set maxTemperatureAtSeaLevel par_maxTemperatureAtSeaLevel
+    set temperatureDecreaseByElevation par_temperatureDecreaseByElevation
+    set temperatureDecreaseBySlope par_temperatureDecreaseBySlope
+  ]
+
+  if (type-of-experiment = "random") ; TODO
+  [
+    ;;; get random values within an arbitrary (reasonable) range of values
+    ;;; this depends on what type and scale of terrain you want
+    ;;; Here, our aim is to create a global-scale terrain (horizontal wrap or cylinder)
+    set numContinents 1 + random 10
+    set numOceans 1 + random 10
+
+    set numRanges 1 + random 100
+    set rangeLength round ( (random-float 1) * maxDist)
+    set rangeElevation random-float 5000
+    set rangeAggregation random-float 0.5
+
+    set numRifts 1 + random 100
+    set riftLength round ( (random-float 1) * maxDist)
+    set riftElevation -1 * random-float 5000
+    set riftAggregation random-float 0.5
+
+    set elevationNoise random-float 1
+
+    set featureAngleRange random-float 30
+
+    set continentality (random-float 2) * count patches
+
+    set elevationSmoothStep 1 ; not randomised
+    set smoothingNeighborhood 0.03 * maxDist ; not randomised
+
+    set seaLevel 0 ; riftElevation + (random-float (rangeElevation - riftElevation))
+
+    set flowAccumulationPerPatch 1 ; not randomised
+    set flowWaterVolume 1 ; not randomised
+    set moistureDiffusionSteps random-float 1
+    set moistureTransferenceRate random-float 1
+
+    set meanSlope random-float 20
+    set stdDevSlope random-float 5
+
+    set axisGridInDegrees random-float 30
+    set yearLenghtInDays 150 + random 400
+    set initialDayInYear random yearLenghtInDays
+
+    set tropicLatitude random-float 45
+    set polarLatitude tropicLatitude + random-float (90 - tropicLatitude)
+
+    set minTemperatureAtSeaLevel -1 * (random-float 50)
+    set maxTemperatureAtSeaLevel random-float 50
+    set temperatureDecreaseByElevation random-float 0.1
+    set temperatureDecreaseBySlope random-float 0.1
+  ]
+  if (type-of-experiment = "defined by experiment-number")
+  [
+    ;load-experiment
+  ]
+
+  set currentDayInYear initialDayInYear
+
+end
+
+to parameters-check-1
+
+  ;;; check if values were reset to 0 (comment out lines if 0 is a valid value)
+  ;;; and set default values
+
+  if (par_rangeElevation = 0)                     [ set par_rangeElevation                   15 ]
+  if (par_riftElevation = 0)                     [ set par_riftElevation                    0 ]
+  if (par_elevationNoise = 0)                      [ set par_elevationNoise                     1 ]
+
+  if (par_numContinents = 0)                    [ set par_numContinents                   1 ]
+  if (par_numOceans = 0)                        [ set par_numOceans                       1 ]
+
+  if (par_continentality = 0)                   [ set par_continentality                  5 ]
+
+  if (par_numRanges = 0)                        [ set par_numRanges                       1 ]
+  if (par_rangeLength = 0)                      [ set par_rangeLength                   100 ]
+  if (par_rangeAggregation = 0)                 [ set par_rangeAggregation                0.75 ]
+
+  if (par_numRifts = 0)                         [ set par_numRifts                        1 ]
+  if (par_riftLength = 0)                       [ set par_riftLength                    100 ]
+  if (par_riftAggregation = 0)                  [ set par_riftAggregation                 0.9 ]
+
+  if (par_seaLevel = 0)                         [ set par_seaLevel                        0 ]
+  if (par_elevationSmoothStep = 0)              [ set par_elevationSmoothStep             1 ]
+  if (par_smoothingNeighborhood = 0)            [ set par_smoothingNeighborhood           0.1 ]
+
+  if (par_flowAccumulationPerPatch = 0)         [ set par_flowAccumulationPerPatch        1 ]
+  if (par_flowWaterVolume = 0)                  [ set par_flowWaterVolume                 1 ]
+
+  if (par_moistureDiffusionSteps = 0)           [ set par_moistureDiffusionSteps        100 ]
+  if (par_moistureTransferenceRate = 0)         [ set par_moistureTransferenceRate        0.2 ]
+
+end
+
+to set-landform-NetLogo ;[ numRanges rangeLength rangeElevation numRifts riftLength riftElevation continentality smoothingNeighborhood elevationSmoothStep]
 
   ; Netlogo-like code
   ask n-of numRanges patches [ sprout-mapSetters 1 [ set points random rangeLength ] ]
@@ -160,14 +328,13 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
       ask patch-here [ set elevation scale ]
       set points points - sign
       if (points = 0) [die]
-      rt (random-exponential par_featureAngleRange) * (1 - random-float 2)
+      rt (random-exponential featureAngleRange) * (1 - random-float 2)
       forward 1
     ]
   ]
 
-  smooth-elevation
+  smooth-elevation-all
 
-  let continentality par_continentality * count patches
   let underWaterPatches patches with [elevation < 0]
   let aboveWaterPatches patches with [elevation > 0]
 
@@ -185,11 +352,11 @@ to set-landform-NetLogo ;[ minElevation maxElevation numRanges rangeLength numRi
     ]
   ]
 
-  smooth-elevation
+  smooth-elevation-all
 
 end
 
-to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinents numRanges rangeLength par_rangeAggregation numOceans numRifts riftLength par_riftAggregation smoothingNeighborhood elevationSmoothStep]
+to set-landform-Csharp ;[ elevationNoise numContinents numRanges rangeLength rangeElevation rangeAggregation numOceans numRifts riftLength riftElevation riftAggregation smoothingNeighborhood elevationSmoothStep]
 
   ; C#-like code
   let p1 0
@@ -200,8 +367,8 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
   let continents n-of numContinents patches
   let oceans n-of numOceans patches
 
-  let maxDistBetweenRanges (1.1 - par_rangeAggregation) * maxDist
-  let maxDistBetweenRifts (1.1 - par_riftAggregation) * maxDist
+  let maxDistBetweenRanges (1.1 - rangeAggregation) * maxDist
+  let maxDistBetweenRifts (1.1 - riftAggregation) * maxDist
 
   repeat (numRanges + numRifts)
   [
@@ -227,14 +394,14 @@ to set-landform-Csharp ;[ minElevation maxElevation par_sdElevation numContinent
     draw-elevation-pattern p1 len elev
   ]
 
-  smooth-elevation
+  smooth-elevation-all
 
   ask patches with [elevation = 0]
   [
-    set elevation random-normal 0 par_sdElevation
+    set elevation random-normal 0 elevationNoise
   ]
 
-  smooth-elevation
+  smooth-elevation-all
 
 end
 
@@ -267,7 +434,7 @@ to draw-elevation-pattern [ p1 len elev ]
 
   repeat len
   [
-    set directionAngle directionAngle + (random-exponential par_featureAngleRange) * (1 - random-float 2)
+    set directionAngle directionAngle + (random-exponential featureAngleRange) * (1 - random-float 2)
     set directionAngle directionAngle mod 360
 
     set p1 p2
@@ -280,23 +447,267 @@ to draw-elevation-pattern [ p1 len elev ]
 
 end
 
-to smooth-elevation ;[ smoothingNeighborhood elevationSmoothStep ]
+to smooth-elevation-all
 
-    ask patches
+  ask patches
   [
-    let smoothedElevation mean [elevation] of patches in-radius smoothingNeighborhood
-    set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
+    smooth-elevation
   ]
 
 end
 
-to refresh-after-seaLevel-change
+to smooth-elevation
 
-  set seaLevel par_seaLevel
+  let smoothedElevation mean [elevation] of patches in-radius smoothingNeighborhood
+  set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
 
-  update-plots
+end
 
-  paint-patches
+;=======================================================================================================
+;;; START of algorithms based on:
+;;; Jenson, S. K., & Domingue, J. O. (1988).
+;;; Extracting topographic structure from digital elevation data for geographic information system analysis.
+;;; Photogrammetric engineering and remote sensing, 54(11), 1593-1600.
+;;; ===BUT used elsewhere, such as in the algorithms based on:
+;;; Huang P C and Lee K T 2015
+;;; A simple depression-filling method for raster and irregular elevation datasets
+;;; J. Earth Syst. Sci. 124 1653–65
+;=======================================================================================================
+
+to-report get-drop-from [ aPatch ] ; ego = patch
+
+  ; "Distance- weighted drop is calculated by subtracting the neighbor’s value from the center cell’s value
+  ; and dividing by the distance from the center cell, √2 for a corner cell and one for a noncorner cell." (p. 1594)
+
+  report ([elevation] of aPatch - elevation) / (distance aPatch)
+
+end
+
+to-report is-at-edge ; ego = patch
+
+  report (;pxcor = min-pxcor or pxcor = max-pxcor or ; the world wraps horizontally
+    pycor = min-pycor or pycor = max-pycor)
+
+end
+
+to-report has-flow-direction-code ; ego = patch
+
+  if (member? flowDirection [ 1 2 4 8 16 32 64 128 ]) [ report true ]
+
+  report false
+
+end
+
+to-report flow-direction-is [ centralPatch ]
+
+  if (flowDirection = get-flow-direction-encoding ([pxcor] of centralPatch - pxcor) ([pycor] of centralPatch - pycor))
+  [ report true ]
+
+  report false
+
+end
+
+to-report get-flow-direction-encoding [ x y ]
+
+  if (x = -1 and y = -1) [ report 16 ]
+  if (x = -1 and y = 0) [ report 32 ]
+  if (x = -1 and y = 1) [ report 64 ]
+
+  if (x = 0 and y = -1) [ report 8 ]
+  if (x = 0 and y = 1) [ report 128 ]
+
+  if (x = 1 and y = -1) [ report 4 ]
+  if (x = 1 and y = 0) [ report 2 ]
+  if (x = 1 and y = 1) [ report 1 ]
+
+  ; exceptions for wraping horizontal edges
+  if (x = world-width - 1)
+  [
+    if (y = -1) [ report 16 ]
+    if (y = 0) [ report 32 ]
+    if (y = 1) [ report 64 ]
+  ]
+  if (x = -1 * (world-width - 1))
+  [
+    if (y = -1) [ report 4 ]
+    if (y = 0) [ report 2 ]
+    if (y = 1) [ report 1 ]
+  ]
+
+end
+
+to-report get-patch-in-flow-direction [ neighborEncoding ] ; ego = patch
+
+  ; 64 128 1
+  ; 32  x  2
+  ; 16  8  4
+
+  if (neighborEncoding = 16) [ report patch (pxcor - 1) (pycor - 1) ]
+  if (neighborEncoding = 32) [ report patch (pxcor - 1) (pycor) ]
+  if (neighborEncoding = 64) [ report patch (pxcor - 1) (pycor + 1) ]
+
+  if (neighborEncoding = 8) [ report patch (pxcor) (pycor - 1) ]
+  if (neighborEncoding = 128) [ report patch (pxcor) (pycor + 1) ]
+
+  if (neighborEncoding = 4) [ report patch (pxcor + 1) (pycor - 1) ]
+  if (neighborEncoding = 2) [ report patch (pxcor + 1) (pycor) ]
+  if (neighborEncoding = 1) [ report patch (pxcor + 1) (pycor + 1) ]
+
+  report nobody
+
+end
+
+to-report flow-direction-is-loop ; ego = patch
+
+  let thisPatch self
+  let dowstreamPatch get-patch-in-flow-direction flowDirection
+  ;print (word "thisPatch: " thisPatch "dowstreamPatch: " dowstreamPatch)
+
+  if (dowstreamPatch != nobody)
+  [ report [flow-direction-is thisPatch] of dowstreamPatch ]
+
+  report false
+
+end
+
+to set-flow-directions
+
+  ask patches with [ flowDirection = 0 ]
+  [
+    ifelse (is-at-edge)
+    [
+      ;if ( pxcor = min-pxcor ) [ set flowDirection 32 ] ; west
+      ;if ( pxcor = max-pxcor ) [ set flowDirection 2 ] ; east
+      if ( pycor = min-pycor ) [ set flowDirection 8 ] ; south
+      if ( pycor = max-pycor ) [ set flowDirection 128 ] ; north
+    ]
+    [
+      set-flow-direction
+    ]
+  ]
+
+end
+
+to set-flow-direction ; ego = patch
+
+  let thisPatch self
+
+  let downstreamPatch max-one-of neighbors [get-drop-from thisPatch]
+
+  set flowDirection get-flow-direction-encoding ([pxcor] of downstreamPatch - pxcor) ([pycor] of downstreamPatch - pycor)
+
+end
+
+to set-flow-accumulations
+
+  ; From Jenson, S. K., & Domingue, J. O. (1988), p. 1594
+  ; "FLOW ACCUMULATION DATA SET
+  ; The third procedure of the conditioning phase makes use of the flow direction data set to create the flow accumulation data set,
+  ; where each cell is assigned a value equal to the number of cells that flow to it (O’Callaghan and Mark, 1984).
+  ; Cells having a flow accumulation value of zero (to which no other cells flow) generally correspond to the pattern of ridges.
+  ; Because all cells in a depressionless DEM have a path to the data set edge, the pattern formed by highlighting cells
+  ; with values higher than some threshold delineates a fully connected drainage network. As the threshold value is increased,
+  ; the density of the drainage network decreases. The flow accumulation data set that was calculated for the numeric example
+  ; is shown in Table 2d, and the visual example is shown in Plate 1c."
+
+  ; identify patches that receive flow and those that do not (this makes the next step much easier)
+  ask patches
+  [
+    set receivesFlow false
+    set flowAccumulationState "start"
+    ;set pcolor red
+  ]
+
+  ask patches with [has-flow-direction-code]
+  [
+    let patchInFlowDirection get-patch-in-flow-direction flowDirection
+    if (patchInFlowDirection != nobody)
+    [
+      ask patchInFlowDirection
+      [
+        set receivesFlow true
+        set flowAccumulationState "pending"
+        ;set pcolor yellow
+      ]
+    ]
+  ]
+
+  let maxIterations 100000 ; just as a safety measure, to avoid infinite loop
+  while [count patches with [flowAccumulationState = "pending" and not flow-direction-is-loop] > 0 and maxIterations > 0 and count patches with [flowAccumulationState = "start"] > 0 ]
+  [
+    ask one-of patches with [flowAccumulationState = "start"]
+    [
+      let downstreamPatch get-patch-in-flow-direction flowDirection
+      let nextFlowAccumulation flowAccumulation + flowAccumulationPerPatch
+
+      set flowAccumulationState "done"
+      ;set pcolor orange
+
+      if (downstreamPatch != nobody)
+      [
+        ask downstreamPatch
+        [
+          set flowAccumulation flowAccumulation + nextFlowAccumulation
+          if (count neighbors with [
+            get-patch-in-flow-direction flowDirection = downstreamPatch and
+            (flowAccumulationState = "pending" or flowAccumulationState = "start")
+            ] = 0
+          )
+          [
+            set flowAccumulationState "start"
+            ;set pcolor red
+          ]
+        ]
+      ]
+    ]
+
+    set maxIterations maxIterations - 1
+  ]
+
+end
+
+;=======================================================================================================
+;;; END of algorithms based on:
+;;; Jenson, S. K., & Domingue, J. O. (1988).
+;;; Extracting topographic structure from digital elevation data for geographic information system analysis.
+;;; Photogrammetric engineering and remote sensing, 54(11), 1593-1600.
+;;; ===BUT used in the algorithms based on:
+;;; Huang P C and Lee K T 2015
+;;; A simple depression-filling method for raster and irregular elevation datasets
+;;; J. Earth Syst. Sci. 124 1653–65
+;=======================================================================================================
+
+to diffuse-moisture
+
+  ask patches [ set water 0 set moisture 0 ]
+
+  ; assign water volume per patch under sea/inundation level
+  ask patches with [ elevation < seaLevel ] [ set water (seaLevel - elevation) * patchArea ]
+
+  ; assign water volume per patch according to flowAccumulation
+  ask patches with [ elevation >= seaLevel and flowAccumulation > 0 ] [ set water flowWaterVolume * flowAccumulation ]
+
+  ; calculate moisture from water volumes
+  ask patches with [ water > 0 ] [ set moisture water ]
+
+  repeat moistureDiffusionSteps
+  [
+    ;diffuse moisture moistureTransferenceRate ; diffuse does not work here because it decreases the moisture of patches with water
+    ask patches with [ moisture = 0 ]
+    [
+      ;;; !!! TO DO: weight the moisture transmission with the difference in elevation
+      let myElevation elevation
+      set tempMoisture moistureTransferenceRate * mean [
+        moisture
+        ;* (max (list 0 (min (list 1 ((elevation - myElevation) / 100))))) ;;; this weighting function assumes maximum transmission with 45º favorable inclination between patches centres
+      ] of neighbors
+    ]
+
+    ask patches with [ moisture = 0 ]
+    [
+      set moisture tempMoisture
+    ]
+  ]
 
 end
 
@@ -414,7 +825,7 @@ to paint-patches
 
   ask patches
   [
-    ifelse (display-mode = "terrain")
+    if (display-mode = "terrain")
     [
       let elevationGradient 0
       ifelse (elevation < seaLevel)
@@ -431,46 +842,221 @@ to paint-patches
         set pcolor rgb (elevationGradient - 100) elevationGradient 0
       ]
     ]
+    if (display-mode = "moisture")
     [
-      ifelse (display-mode = "sun angle at noon")
+      set pcolor 92 + (7 * 1E100 ^ (1 - moisture / (max [moisture] of patches)) / 1E100)
+    ]
+    if (display-mode = "sun angle at noon")
+    [
+      set pcolor rgb (255 * (sunAngle / 90)) 0 0
+    ]
+    if (display-mode = "temperature")
+    [
+      set pcolor rgb (255 * (abs (minTemperature - temperature) / abs (maxTemperature - minTemperature))) 0 0
+    ]
+
+    display-windDirections
+  ]
+
+  display-flows
+
+end
+
+to display-flows
+
+  if (not any? flowHolders)
+  [
+    ask patches [ sprout-flowHolders 1 [ set hidden? true ] ]
+  ]
+
+  ifelse (show-flows)
+  [
+    ask patches with [ count neighbors with [elevation > seaLevel] > 0 ]
+    [
+      let flowDirectionHere flowDirection
+      let nextPatchInFlow get-patch-in-flow-direction flowDirection
+      let flowAccumulationHere flowAccumulation
+
+      ask one-of flowHolders-here
       [
-        set pcolor rgb (255 * (sunAngle / 90)) 0 0
-      ]
-      [
-        if (display-mode = "temperature")
+        ifelse (nextPatchInFlow != nobody)
         [
-          set pcolor rgb (255 * (abs (minTemperature - temperature) / abs (maxTemperature - minTemperature))) 0 0
+          if (link-with one-of [flowHolders-here] of nextPatchInFlow = nobody)
+          [ create-link-with one-of [flowHolders-here] of nextPatchInFlow ]
+
+          ask link-with one-of [flowHolders-here] of nextPatchInFlow
+          [
+            set hidden? false
+            let multiplier 1E100 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E100
+            set color 92 + (5 * multiplier)
+            set thickness 0.4 * ( 1 - ((color - 92) / 5))
+          ]
+        ]
+        [
+          set hidden? false
+          let multiplier 1E100 ^ (1 - flowAccumulationHere / (max [flowAccumulation] of patches)) / 1E100
+          set color 92 + (5 * multiplier)
+          let dir get-angle-in-flow-direction flowDirection
+          ifelse (dir != nobody)
+          [
+            if (color <= 97) [ set shape "line half" ]
+            if (color < 95) [ set shape "line half 1" ]
+            if (color < 93) [ set shape "line half 2" ]
+            set heading dir
+          ]
+          [ set shape "circle" ] ; this is a drainage sink
         ]
       ]
     ]
-    ifelse (show-windDirections)
+
+    ask patches with [ count neighbors with [elevation > seaLevel] = 0 ]
     [
-      let thisPatch self
-      ifelse (any? windIndicators-here)
+      ask one-of flowHolders-here
       [
-        ask one-of windIndicators-here [ set hidden? false face [windDirection] of thisPatch ]
-      ]
-      [
-        sprout-windIndicators 1 [ set shape "wind" set color black set size 1.5 face [windDirection] of thisPatch ]
+        set hidden? true
+        ask my-links [ set hidden? true ]
       ]
     ]
+  ]
+  [
+    ask flowHolders
     [
-      if (any? windIndicators-here)
-      [
-        ask one-of windIndicators-here [ set hidden? true ]
-      ]
+      set hidden? true
+      ask my-links [ set hidden? true ]
     ]
   ]
 
 end
 
-to refresh
+to-report get-angle-in-flow-direction [ neighborEncoding ]
+
+  ; 64 128 1
+  ; 32  x  2
+  ; 16  8  4
+
+  if (neighborEncoding = 16) [ report 225 ]
+  if (neighborEncoding = 32) [ report 270 ]
+  if (neighborEncoding = 64) [ report 315 ]
+
+  if (neighborEncoding = 8) [ report 180 ]
+  if (neighborEncoding = 128) [ report 0 ]
+
+  if (neighborEncoding = 4) [ report 135 ]
+  if (neighborEncoding = 2) [ report 90 ]
+  if (neighborEncoding = 1) [ report 45 ]
+
+  report nobody
+
+end
+
+to display-windDirections
+
+  ifelse (show-windDirections)
+  [
+    let thisPatch self
+    ifelse (any? windIndicators-here)
+    [
+      ask one-of windIndicators-here [ set hidden? false face [windDirection] of thisPatch ]
+    ]
+    [
+      sprout-windIndicators 1 [ set shape "wind" set color black set size 1.5 face [windDirection] of thisPatch ]
+    ]
+  ]
+  [
+    if (any? windIndicators-here)
+    [
+      ask one-of windIndicators-here [ set hidden? true ]
+    ]
+  ]
+
+end
+
+to refresh-view
+
+  update-plots
+
+  paint-patches
+
+end
+
+to refresh-after-seaLevel-change
 
   set seaLevel par_seaLevel
+
+  update-plots
+
+  paint-patches
+
+end
+
+to refresh
+
+  refresh-after-seaLevel-change
+
   set currentDayInYear par_initialDayInYear
+
   update-climate
 
   paint-patches
+
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; FILE HANDLING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to export-random-terrain
+
+  set randomSeed randomSeed + 1 ; this allows for creating multiple terrains when executing this procedure continuosly
+
+  create-terrain
+
+  export-terrain
+
+end
+
+to export-terrain
+
+  ;set show-transects false
+
+  ;update-transects
+
+  ;;; build a file name as unique to this setting as possible
+  let filePath (word "terrains//terrainGenerator_withClimate_v01_" type-of-experiment "_w=" world-width "_h=" world-height "_a=" algorithm-style "_seed=" randomSeed)
+
+  if (type-of-experiment = "user-defined") [ set filePath (word filePath "_" date-and-time) ]
+  ;if (type-of-experiment = "defined by expNumber") [set filePath (word filePath "_" expNumber) ]
+
+  ;print filePath print length filePath ; de-bug print
+
+;;; check that filePath does not exceed 100 (not common in this context)
+  if (length filePath > 100) [ print "WARNING: file path may be too long, depending on your current directory. Decrease length of file name or increase the limit." set filePath substring filePath 0 100 ]
+
+  let filePathCSV (word filePath ".csv")
+
+  let filePathPNG (word filePath ".png")
+
+  export-view filePathPNG
+  export-world filePathCSV
+
+end
+
+to import-terrain
+
+  ;;; build a unique file name according to the user setting
+  let filePath (word "terrains//terrainGenerator_withClimate_v01_" type-of-experiment "_w=" world-width "_h=" world-height "_a=" algorithm-style "_seed=" randomSeed)
+
+  if (type-of-experiment = "user-defined") [ set filePath (word filePath "_" date-and-time) ]
+  ;if (type-of-experiment = "defined by expNumber") [set filePath (word filePath "_" expNumber) ]
+
+  ;;; check that filePath does not exceed 100 (not common in this context)
+  if (length filePath > 100) [ print "WARNING: file path may be too long, depending on your current directory. Decrease length of file name or increase the limit." set filePath substring filePath 0 100 ]
+
+  set filePath (word filePath ".csv")
+
+  ifelse (file-exists? filePath)
+  [ import-world filePath ]
+  [ print (word "WARNING: could not find '" filePath "'") ]
 
 end
 @#$#@#$#@
@@ -504,25 +1090,25 @@ ticks
 BUTTON
 9
 10
-68
+76
 57
-NIL
-setup
+create
+create-terrain
 NIL
 1
 T
 OBSERVER
 NIL
-NIL
+1
 NIL
 NIL
 1
 
 MONITOR
-328
-105
-429
-150
+341
+104
+442
+149
 NIL
 landOceanRatio
 4
@@ -530,14 +1116,14 @@ landOceanRatio
 11
 
 SLIDER
-453
-13
-625
-46
+502
+14
+674
+47
 par_seaLevel
 par_seaLevel
-min (list minElevation par_minElevation)
-min (list maxElevation par_maxElevation)
+min (list minElevation par_riftElevation)
+min (list maxElevation par_rangeElevation)
 0.0
 1
 1
@@ -547,10 +1133,10 @@ HORIZONTAL
 SLIDER
 3
 207
-175
+183
 240
-par_sdElevation
-par_sdElevation
+par_elevationNoise
+par_elevationNoise
 1
 5000
 801.0
@@ -586,10 +1172,10 @@ randomSeed
 Number
 
 MONITOR
-177
-153
-275
-198
+190
+152
+288
+197
 sdElevation
 precision sdElevation 4
 4
@@ -597,10 +1183,10 @@ precision sdElevation 4
 11
 
 MONITOR
-277
-153
-359
-198
+290
+152
+372
+197
 minElevation
 precision minElevation 4
 4
@@ -608,10 +1194,10 @@ precision minElevation 4
 11
 
 MONITOR
-355
-153
-434
-198
+368
+152
+447
+197
 maxElevation
 precision maxElevation 4
 4
@@ -665,10 +1251,10 @@ Number
 SLIDER
 3
 141
-175
+181
 174
-par_minElevation
-par_minElevation
+par_riftElevation
+par_riftElevation
 -5000
 0
 -5000.0
@@ -678,10 +1264,10 @@ m
 HORIZONTAL
 
 BUTTON
-425
-49
-658
-82
+452
+53
+685
+86
 refresh after changing sea level or initial day
 refresh
 NIL
@@ -697,10 +1283,10 @@ NIL
 SLIDER
 3
 174
-175
+181
 207
-par_maxElevation
-par_maxElevation
+par_rangeElevation
+par_rangeElevation
 0
 5000
 5000.0
@@ -710,10 +1296,10 @@ m
 HORIZONTAL
 
 MONITOR
-174
-105
-256
-150
+187
+104
+269
+149
 NIL
 count patches
 0
@@ -788,10 +1374,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-257
-105
-322
-150
+270
+104
+335
+149
 maxDist
 precision maxDist 4
 4
@@ -837,7 +1423,7 @@ par_axisGridInDegrees
 par_axisGridInDegrees
 0
 90
-23.5
+20.0
 0.1
 1
 degrees
@@ -999,13 +1585,13 @@ currentDayInYear
 11
 
 CHOOSER
-171
-13
-310
-58
+278
+12
+417
+57
 display-mode
 display-mode
-"terrain" "sun angle at noon" "temperature"
+"terrain" "moisture" "sun angle at noon" "temperature"
 0
 
 MONITOR
@@ -1079,10 +1665,10 @@ Latitude
 1
 
 BUTTON
-319
-21
-382
-54
+431
+13
+494
+46
 refresh
 paint-patches
 NIL
@@ -1096,13 +1682,13 @@ NIL
 1
 
 SWITCH
-171
-60
-318
-93
+263
+61
+410
+94
 show-windDirections
 show-windDirections
-0
+1
 1
 -1000
 
@@ -1208,6 +1794,148 @@ par_continentality
 1
 0
 Number
+
+SLIDER
+14
+588
+257
+621
+par_flowAccumulationPerPatch
+par_flowAccumulationPerPatch
+0
+2
+1.0
+0.001
+1
+NIL
+HORIZONTAL
+
+SLIDER
+14
+622
+257
+655
+par_flowWaterVolume
+par_flowWaterVolume
+0
+100
+1.0
+1
+1
+m^3 / patch
+HORIZONTAL
+
+SLIDER
+264
+588
+486
+621
+par_moistureDiffusionSteps
+par_moistureDiffusionSteps
+0
+100
+100.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+263
+621
+486
+654
+par_moistureTransferenceRate
+par_moistureTransferenceRate
+0
+1
+0.2
+0.01
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+21
+567
+252
+601
+Flow accumulation & moisture
+14
+0.0
+1
+
+CHOOSER
+152
+12
+278
+57
+type-of-experiment
+type-of-experiment
+"random" "user-defined" "defined by expNumber"
+0
+
+SWITCH
+154
+61
+258
+94
+show-flows
+show-flows
+0
+1
+-1000
+
+BUTTON
+789
+530
+899
+563
+NIL
+export-terrain
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+901
+530
+1009
+563
+NIL
+import-terrain
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1013
+530
+1209
+563
+export-random-terrain (100x)
+repeat 100 [ export-random-terrain ]
+NIL
+1
+T
+OBSERVER
+NIL
+9
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -1411,6 +2139,18 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+line half 1
+true
+0
+Line -7500403 true 150 0 150 300
+Rectangle -7500403 true true 135 0 165 150
+
+line half 2
+true
+0
+Line -7500403 true 150 0 150 300
+Rectangle -7500403 true true 120 0 180 150
 
 pentagon
 false

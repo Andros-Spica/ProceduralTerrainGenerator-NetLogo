@@ -2,7 +2,7 @@
 ;;; GNU GENERAL PUBLIC LICENSE ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;  Terrain Generator model v.0.1
+;;  Terrain Generator model - loader
 ;;  Copyright (C) 2018 Andreas Angourakis (andros.spica@gmail.com)
 ;;
 ;;  This program is free software: you can redistribute it and/or modify
@@ -18,251 +18,250 @@
 ;;  You should have received a copy of the GNU General Public License
 ;;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+extensions [ csv ]
+
 breed [ transectLines transectLine ]
+breed [ flowHolders flowHolder ]
 
 globals
 [
-  ;;; parameters (copies) ===============================================================
-  landPercentage
-  continentality
+  patchArea
+  maxDist
+
+  ;;; parameters ===============================================================
+
+  algorithm-style
+  do-fill-sinks
+
+  par_maxElevation
+  par_minElevation
+  par_sdElevation
+
+  numContinents
+  numOceans
+  numRanges
+  rangeLength
+  rangeAggregation
+  numRifts
+  riftLength
+  riftAggregation
+  featureAngleRange
   seaLevel
-  minElevation
-  meanElevation
-  sdElevation
-  maxElevation
+
+  continentality
+
   elevationSmoothStep
+  smoothingNeighborhood
+
+  xSlope
+  ySlope
+
+  valleyAxisInclination
+  valleySlope
+
+  flowAccumulationPerPatch
+  flowWaterVolume
+  riverFlowAccumulationAtStart
+
+  moistureDiffusionSteps
+  moistureTransferenceRate
 
   ;;; variables ===============================================================
   landOceanRatio
+  elevationDistribution
+  minElevation
+  sdElevation
+  maxElevation
+
+  startRiverPatch
+  riverPathPoints
 ]
 
 patches-own
 [
-  land
   elevation
+  flowDirection
+  receivesFlow flowAccumulationState
+  flowAccumulation
+  water
+  moisture
+  tempMoisture
 ]
 
-to setup
+to load-terrain
 
   clear-all
 
-  set landPercentage par_landPercentage ; 30
-  set continentality par_continentality ; 5
-  set seaLevel par_seaLevel ; 0
-  set minElevation par_minElevation ; -2000
-  set meanElevation par_meanElevation ; 0
-  set sdElevation par_sdElevation ; 1000
-  set maxElevation par_maxElevation ; 3000
-  set elevationSmoothStep par_elevationSmoothStep ; 1
+  ;;; load a terrain from the "terrains" folder
+  ;;; corresponding to the random seed given as a parameter in the interface
 
-  random-seed randomSeed
-  setLandform
+  let filename (word "terrains//terrain_terrainGenerator_v2_" randomSeed ".csv")
 
-  set landOceanRatio count patches with [land = 1] / count patches
+  file-open filename
 
-  paintPatches
-
-  setup-patch-coordinates-labels "bottom" "left"
-
-  setup-transect
-
-  update-transects
-
-  update-plots
-
-end
-
-to setLandform
-
-  ask patches
+  while [not file-at-end?]
   [
-    ifelse (random-float 1 < landPercentage / 100)
-    [
-      set land 1
-    ]
-    [
-      set land -1
-    ]
-  ]
+    let thisLine csv:from-row file-read-line
 
-  repeat continentality
-  [
-    ask patches
+    if (item 0 thisLine = "GLOBALS")
     [
-      let surroundingLand count neighbors with [land = 1]
-      if (surroundingLand < 4)
+      ;;; read and set basic NetLogo globals
+      let globalNames csv:from-row file-read-line
+      let globalValues csv:from-row file-read-line
+
+      ;;; apply world dimensions
+      resize-world (item 0 globalValues) (item 1 globalValues) (item 2 globalValues) (item 3 globalValues)
+
+      ;;; read relevant globals searching for specific names
+      foreach (n-values length(globalValues) [j -> j])
       [
-        set land -1
+        globalIndex ->
+
+        if (item globalIndex globalNames = "algorithm-style") [ set algorithm-style read-from-string item globalIndex globalValues ]
+        if (item globalIndex globalNames = "display-mode") [ set display-mode read-from-string item globalIndex globalValues ]
+        if (item globalIndex globalNames = "do-fill-sinks") [ set do-fill-sinks item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "par_maxelevation") [ set par_maxElevation item globalIndex globalValues ]
+        if (item globalIndex globalNames = "par_minelevation") [ set par_minElevation item globalIndex globalValues ]
+        if (item globalIndex globalNames = "par_sdelevation") [ set par_sdElevation item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "numcontinents") [ set numContinents item globalIndex globalValues ]
+        if (item globalIndex globalNames = "numoceans") [ set numOceans item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "numranges") [ set numRanges item globalIndex globalValues ]
+        if (item globalIndex globalNames = "rangelength") [ set rangeLength item globalIndex globalValues ]
+        if (item globalIndex globalNames = "rangeaggregation") [ set rangeAggregation item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "numrifts") [ set numRifts item globalIndex globalValues ]
+        if (item globalIndex globalNames = "riftlength") [ set riftLength item globalIndex globalValues ]
+        if (item globalIndex globalNames = "riftaggregation") [ set riftAggregation item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "sealevel") [ set seaLevel item globalIndex globalValues ]
+        if (item globalIndex globalNames = "continentality") [ set continentality item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "elevationsmoothstep") [ set elevationSmoothStep item globalIndex globalValues ]
+        if (item globalIndex globalNames = "smoothingneighborhood") [ set smoothingNeighborhood item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "xslope") [ set xSlope item globalIndex globalValues ]
+        if (item globalIndex globalNames = "yslope") [ set ySlope item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "valleyaxisinclination") [ set valleyAxisInclination item globalIndex globalValues ]
+        if (item globalIndex globalNames = "valleyslope") [ set valleySlope item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "flowaccumulationperpatch") [ set flowAccumulationPerPatch item globalIndex globalValues ]
+        if (item globalIndex globalNames = "flowwatervolume") [ set flowWaterVolume item globalIndex globalValues ]
+        if (item globalIndex globalNames = "riverflowaccumulationatstart") [ set riverFlowAccumulationAtStart item globalIndex globalValues ]
+
+        if (item globalIndex globalNames = "moisturediffusionsteps") [ set moistureDiffusionSteps item globalIndex globalValues ]
+        if (item globalIndex globalNames = "moisturetransferencerate") [ set moistureTransferenceRate item globalIndex globalValues ]
       ]
-      if (surroundingLand > 4)
+    ]
+
+    if (item 0 thisLine = "TURTLES" and load-turtles) ;;; load turtles is optional because they are use for visualisation
+    [
+      set thisLine csv:from-row file-read-line ;;; skip variable names
+      set thisLine csv:from-row file-read-line ;;; first row of data
+
+      ;;; create a auxiliar turtles
+      while [ length thisLine > 1 ]
       [
-        set land 1
+        create-flowHolders 1
+        [
+          set xcor item 3 thisLine
+          set ycor item 4 thisLine
+          set hidden? item 9 thisLine
+          if (xcor = max-pxcor or xcor = min-pxcor or ycor = max-pycor or ycor = min-pycor)
+          [
+            set color item 1 thisLine
+            set heading item 2 thisLine
+            set shape read-from-string item 5 thisLine
+            set hidden? false
+          ]
+        ]
+        set thisLine csv:from-row file-read-line
+      ]
+    ]
+
+    if (item 0 thisLine = "PATCHES")
+    [
+      let patchVarsNames csv:from-row file-read-line ;;; save variable names
+      set thisLine csv:from-row file-read-line ;;; first row of data
+
+      ;;; load patch variables per each patch
+      while [ length thisLine > 1 ]
+      [
+        ask patch (item 0 thisLine) (item 1 thisLine)
+        [
+          let colorRGBValues read-from-string (item 2 thisLine)
+          set pcolor rgb (item 0 colorRGBValues) (item 1 colorRGBValues) (item 2 colorRGBValues)
+
+          set elevation item 5 thisLine
+          set flowdirection item 6 thisLine
+          set receivesflow item 7 thisLine
+          set flowaccumulationstate read-from-string item 8 thisLine
+          set flowaccumulation item 9 thisLine
+          set water item 10 thisLine
+          set moisture item 11 thisLine
+          set tempmoisture item 12 thisLine
+        ]
+        set thisLine csv:from-row file-read-line
+      ]
+    ]
+
+    if (item 0 thisLine = "LINKS" and load-turtles) ;;; load links is optional because they are use for visualisation
+    [
+      set thisLine csv:from-row file-read-line ;;; skip variable names
+
+      set thisLine csv:from-row file-read-line ;;; first row of data
+
+      ;;; create links
+      while [ length thisLine > 1 ]
+      [
+        let flowHolderEnd1 flowHolder get-flowHolder-who-from-link-data (item 0 thisLine)
+        let flowHolderEnd2 flowHolder get-flowHolder-who-from-link-data (item 1 thisLine)
+
+        ask flowHolderEnd1
+        [
+          create-link-with flowHolderEnd2
+          [
+            set color item 2 thisLine
+            set thickness item 7 thisLine
+          ]
+        ]
+        set thisLine csv:from-row file-read-line
       ]
     ]
   ]
+  file-close
 
-  ask patches
-  [
-    set elevation land * (random-normal meanElevation sdElevation)
-    while [elevation < minElevation OR elevation > maxElevation]
-    [
-      set elevation land * (random-normal meanElevation sdElevation)
-      ;minElevation + (random-normal meanElevation sdElevation) * (maxElevation - minElevation)
-    ]
-  ]
-
-  ask patches
-  [
-    let smoothedElevation mean [elevation] of neighbors
-    set elevation elevation + (smoothedElevation - elevation) * elevationSmoothStep
-    ifelse (elevation < seaLevel)
-    [ set land -1 ] [ set land 1 ]
-  ]
+  ask one-of flowHolders with [[flowAccumulation] of patch-here = riverFlowAccumulationAtStart] [ set hidden? true ]
 
 end
 
-to paintPatches
+to-report get-flowHolder-who-from-link-data [ linkDataEntry ]
 
-  ask patches
-  [
-    let elevationGradient 0
-    ifelse (elevation < seaLevel)
-    [
-      set elevationGradient 20 + (200 * (1 - elevation / minElevation))
-      set pcolor rgb 0 0 elevationGradient
-    ]
-    [
-      set elevationGradient 100 + (155 * (elevation / maxElevation))
-      set pcolor rgb  0 elevationGradient 0
-    ]
-  ]
-
-end
-
-to setup-patch-coordinates-labels [ XcoordPosition YcoordPosition ]
-
-  let xspacing floor (world-width / patch-size)
-  let yspacing floor (world-height / patch-size)
-
-  ifelse (XcoordPosition = "bottom")
-  [
-    ask patches with [ pycor = min-pycor ]
-    [
-      if (pxcor mod xspacing = 0)
-      [ set plabel (word pxcor) ]
-    ]
-  ]
-  [
-    ask patches with [ pycor = max-pycor ]
-    [
-      if (pxcor mod xspacing = 0)
-      [ set plabel (word pxcor) ]
-    ]
-  ]
-
-  ifelse (YcoordPosition = "left")
-  [
-    ask patches with [ pxcor = min-pxcor ]
-    [
-      if (pycor mod yspacing = 0)
-      [ set plabel (word pycor) ]
-    ]
-  ]
-  [
-    ask patches with [ pycor = max-pycor ]
-    [
-      if (pycor mod yspacing = 0)
-      [ set plabel (word pycor) ]
-    ]
-  ]
-
-end
-
-to setup-transect
-
-  ask patches with [ pxcor = xTransect ]
-  [
-    sprout-transectLines 1 [ set shape "line" set heading 0 set color white ]
-  ]
-
-  ask patches with [ pycor = yTransect ]
-  [
-    sprout-transectLines 1 [ set shape "line" set heading 90 set color white ]
-  ]
-
-  if (not show-transects)
-  [
-    ask transectLines [ set hidden? true ]
-  ]
-
-end
-
-to update-transects
-
-    ifelse (show-transects)
-  [
-    ask transectLines
-    [
-      ifelse (heading = 0) [ set xcor xTransect ] [ set ycor yTransect ]
-      set hidden? false
-    ]
-  ]
-  [
-    ask transectLines [ set hidden? true ]
-  ]
-
-end
-
-to plot-horizontal-transect
-
-  foreach (n-values world-width [ j -> min-pxcor + j ])
-  [
-    x ->
-    plotxy x ([elevation] of patch x yTransect)
-  ]
-  plot-pen-up
-
-end
-
-to plot-vertical-transect
-
-  foreach (n-values world-height [ j -> min-pycor + j ])
-  [
-    y ->
-    plotxy ([elevation] of patch xTransect y) y
-  ]
-  plot-pen-up
-
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; FILE HANDLING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to export-terrain
-
-  set show-transects false
-
-  update-transects
-
-  export-world (word "terrains//terrain_terrainGenerator_v01_" randomSeed ".csv")
-
-end
-
-to import-terrain
-
-  import-world (word "terrains//terrain_terrainGenerator_v01_" randomSeed ".csv")
+  let str remove "{" linkDataEntry
+  set str remove "f" str
+  set str remove "l" str
+  set str remove "o" str
+  set str remove "w" str
+  set str remove "h" str
+  set str remove "d" str
+  set str remove "e" str
+  set str remove "r" str
+  set str remove " " str
+  report read-from-string remove "}" str
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-292
-43
-710
-462
+210
+10
+868
+669
 -1
 -1
-10.0
+13.0
 1
 10
 1
@@ -272,267 +271,45 @@ GRAPHICS-WINDOW
 1
 1
 1
--20
-20
--20
-20
+0
+49
+0
+49
 0
 0
 1
 ticks
 30.0
 
-BUTTON
-13
-14
-76
-47
-NIL
-setup
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-MONITOR
-69
-415
-170
-460
-Land / Ocean
-landOceanRatio
-4
-1
-11
-
-SLIDER
-31
-185
-203
-218
-par_seaLevel
-par_seaLevel
-par_minElevation
-par_maxElevation
-0.0
-1
-1
-m
-HORIZONTAL
-
-SLIDER
-30
-150
-202
-183
-par_landPercentage
-par_landPercentage
-0
-100
-50.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-29
-114
-201
-147
-par_continentality
-par_continentality
-1
-50
-1.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-30
-235
-202
-268
-par_minElevation
-par_minElevation
--5000
-0
--5000.0
-100
-1
-m
-HORIZONTAL
-
-SLIDER
-29
-267
-202
-300
-par_meanElevation
-par_meanElevation
-par_minElevation
-par_maxElevation
--101.0
-100
-1
-m
-HORIZONTAL
-
-SLIDER
-29
-300
-202
-333
-par_sdElevation
-par_sdElevation
-1
-max (list par_maxElevation (- par_minElevation))
-1101.0
-100
-1
-m
-HORIZONTAL
-
-SLIDER
-29
-332
-201
-365
-par_maxElevation
-par_maxElevation
-0
-5000
-5000.0
-100
-1
-m
-HORIZONTAL
-
-SLIDER
-26
-378
-214
-411
-par_elevationSmoothStep
-par_elevationSmoothStep
+SWITCH
+44
+180
+163
+213
+load-turtles
+load-turtles
 0
 1
-0.76
-0.01
-1
-NIL
-HORIZONTAL
+-1000
 
 INPUTBOX
-82
-10
-158
-70
+43
+117
+165
+177
 randomSeed
-0.0
+8656.0
 1
 0
 Number
 
-PLOT
-9
-463
-240
-599
-Elevation
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"set-plot-x-range par_minElevation par_maxElevation" "set-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
-PENS
-"default" 1.0 1 -16777216 false "histogram [elevation] of patches" "histogram [elevation] of patches"
-"pen-1" 1.0 1 -2674135 true "" "histogram n-values plot-y-max [j -> seaLevel]"
-
-PLOT
-258
-466
-715
-586
-Horizontal transect
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" "clear-plot\nset-plot-x-range (min-pxcor - 1) (max-pxcor + 1)\nset-plot-y-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
-PENS
-"default" 1.0 0 -16777216 true "" "plot-horizontal-transect"
-
-SLIDER
-255
-34
-288
-466
-yTransect
-yTransect
-min-pycor
-max-pycor
-8.0
-1
-1
-NIL
-VERTICAL
-
-SLIDER
-285
-10
-719
+BUTTON
+42
 43
-xTransect
-xTransect
-min-pxcor
-max-pxcor
-5.0
-1
-1
+138
+76
 NIL
-HORIZONTAL
-
-PLOT
-716
-28
-876
-473
-plot 1
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" "clear-plot\nset-plot-y-range (min-pycor - 1) (max-pycor + 1)\nset-plot-x-range (round min [elevation] of patches - 1) (round max [elevation] of patches + 1)"
-PENS
-"default" 1.0 0 -16777216 true "" "plot-vertical-transect"
-
-BUTTON
-731
-524
-848
-557
-update transects
-update-transects\nupdate-plots
+load-terrain
 NIL
 1
 T
@@ -543,55 +320,20 @@ NIL
 NIL
 1
 
-SWITCH
-721
-489
-862
-522
-show-transects
-show-transects
-1
-1
--1000
-
-BUTTON
-16
-73
-126
-106
-NIL
-export-terrain
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-127
-73
-235
-106
-NIL
-import-terrain
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
+CHOOSER
+45
+222
+183
+267
+display-mode
+display-mode
+"terrain" "moisture"
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-the initial, quite simple approach.
+(a general understanding of what the model is trying to show or explain)
 
 ## HOW IT WORKS
 
@@ -790,6 +532,18 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+line half 1
+true
+0
+Line -7500403 true 150 0 150 300
+Rectangle -7500403 true true 135 0 165 150
+
+line half 2
+true
+0
+Line -7500403 true 150 0 150 300
+Rectangle -7500403 true true 120 0 180 150
 
 pentagon
 false
