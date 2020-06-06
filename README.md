@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/133016249.svg)](https://zenodo.org/badge/latestdoi/133016249)
+
 # Procedural Terrain Generator - NetLogo
 Procedural generation of maps (terrain, climate, biomes) using [NetLogo](https://ccl.northwestern.edu/netlogo/).
 <PENDING TO DEVELOP INFO>
