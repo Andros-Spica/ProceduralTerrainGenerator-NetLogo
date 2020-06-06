@@ -1,4 +1,4 @@
-# ProceduralMap-NetLogo
+# Procedural Terrain Generator - NetLogo
 Procedural generation of maps (terrain, climate, biomes) using [NetLogo](https://ccl.northwestern.edu/netlogo/).
 <PENDING TO DEVELOP INFO>
 
